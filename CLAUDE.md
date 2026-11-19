@@ -160,6 +160,7 @@ priorité n°1.
 - Dates de prise de vue stockées en UTC, affichées dans le fuseau du voyage.
 - Récits en Markdown.
 - Secrets uniquement dans `.env`, jamais commité.
+- Originaux Nextcloud lus en mémoire seulement, jamais écrits sur disque.
 - Tests obligatoires pour l'import et l'extraction des métadonnées.
 - N'accède à aucune machine du réseau en dehors de Nextcloud.
 - Animations : respecte `prefers-reduced-motion`.
@@ -171,6 +172,7 @@ priorité n°1.
 - `docker compose exec backend python manage.py test` : tests backend
 - `docker compose exec frontend npm run build` : vérification TypeScript + build (puis supprimer `frontend/dist`)
 - `docker compose exec backend python manage.py createsuperuser` : compte admin (`/admin/`)
+- `docker compose exec backend python manage.py import_voyage "<dossier>" --fuseau Asia/Tokyo [--horloge "Canon EOS 100D=UTC"] [--titre ...] [--limite N] [--dry-run]` : importe ou réimporte un dossier Nextcloud (chemin depuis la racine de l'utilisateur, ex. `/Shared/Japon …`). Relançable sans doublons ; `--fuseau` seulement au premier import ; le rapport final compare Nextcloud et la base.
 - Ajout d'une dépendance front : `docker compose exec frontend npm install <paquet>` puis `docker compose up -d --build frontend`
 - URL de dev : http://192.168.30.252:5173 (le proxy Vite relaie `/api` vers le backend)
 

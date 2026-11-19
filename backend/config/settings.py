@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "core",
+    "voyages",
 ]
 
 MIDDLEWARE = [
@@ -81,3 +82,9 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"]
     + (["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else []),
 }
+
+# Nextcloud : source des photos, lue en WebDAV et en lecture seule.
+# Lues sans valeur par défaut obligatoire : seule la commande d'import en a besoin.
+NEXTCLOUD_URL = os.environ.get("NEXTCLOUD_URL", "").rstrip("/")
+NEXTCLOUD_USER = os.environ.get("NEXTCLOUD_USER", "")
+NEXTCLOUD_PASSWORD = os.environ.get("NEXTCLOUD_PASSWORD", "")
