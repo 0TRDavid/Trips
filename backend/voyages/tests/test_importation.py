@@ -123,7 +123,10 @@ class ImportTests(TestCase):
         self.assertEqual(rapport.mises_a_jour, 1)
         self.assertEqual(photo.etag, "e1-v2")
         self.assertEqual(photo.jour.date, date(2025, 4, 6))
-        self.assertEqual((photo.legende, photo.favori, photo.ordre, photo.visible), ("Fushimi Inari", True, 4, False))
+        self.assertEqual((photo.legende, photo.favori, photo.visible), ("Fushimi Inari", True, False))
+        # Elle a changé de jour : son rang dans l'ancien jour n'a plus de sens, elle se
+        # range à la fin du nouveau (seule photo du 6 ici). Voir test_ordre.py.
+        self.assertEqual(photo.ordre, 1)
         self.assertEqual(Photo.objects.count(), 3)
 
     def test_recits_et_titres_jamais_ecrases(self):

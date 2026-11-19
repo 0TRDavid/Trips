@@ -166,6 +166,10 @@ priorité n°1.
 - Animations : respecte `prefers-reduced-motion`.
 - Rendus : WebP générés par `voyages/rendus.py`, jamais d'EXIF/XMP/ICC passés à `save()` ; le cache est régénérable, seule la base est irremplaçable.
 - Après un changement de `vite.config.ts` : `docker compose restart frontend`.
+- Après la création d'un nouveau module Python jamais importé (ex. `admin.py`) : `docker compose restart backend` (runserver ne le surveille pas encore).
+- Markdown : un seul moteur, `voyages/markdown.py: rendre_markdown()` (API, aperçu admin, futur export). Le HTML écrit dans un récit n'est jamais interprété.
+- API en lecture seule, sans N+1 : chaque endpoint a un nombre de requêtes fixe, vérifié par `NombreDeRequetesTests` (à mettre à jour si on ajoute une requête). Jamais de chemin Nextcloud, d'etag ni de coordonnées par photo dans l'API.
+- Voyages, jours et photos naissent de l'import : l'admin ne les crée ni ne les supprime.
 
 ## Commandes
 - `cp .env.example .env` : première fois seulement, puis changer les secrets
@@ -176,9 +180,14 @@ priorité n°1.
 - `docker compose exec backend python manage.py createsuperuser` : compte admin (`/admin/`)
 - `docker compose exec backend python manage.py import_voyage "<dossier>" --fuseau Asia/Tokyo [--horloge "Canon EOS 100D=UTC"] [--titre ...] [--limite N] [--dry-run]` : importe ou réimporte un dossier Nextcloud (chemin depuis la racine de l'utilisateur, ex. `/Shared/Japon …`). Relançable sans doublons ; `--fuseau` seulement au premier import ; le rapport final compare Nextcloud et la base.
   Génère ensuite les rendus web du voyage (sauf `--sans-rendus`).
-- `docker compose exec backend python manage.py generer_rendus [--voyage <slug>] [--force] [--processus N] [--dry-run]` : rendus WebP (400 / 1280 / 2560 px, sans métadonnées) dans le volume `rendus` (`/cache/rendus/<photo_id>/<etag>-<taille>.webp`). Ne régénère que les photos dont l'etag a changé ou dont un fichier manque. Japon : 98 photos en ~45 s, ~70 Mo.
-- `docker compose exec backend sh -c 'exiftool -a -s -gps:all /cache/rendus/*/*.webp'` : contrôle qu'aucun rendu ne contient de GPS (ne doit rien afficher)
-- API : `GET /api/voyages/<slug>/photos/` (photos visibles, dimensions, couleur, ThumbHash, URL des rendus en `/media/…`)
+- `docker compose exec backend python manage.py generer_rendus [--voyage <slug>] [--photos 1,2,3] [--force] [--processus N] [--dry-run]` : rendus WebP (400 / 1280 / 2560 px, sans métadonnées) dans le volume `rendus` (`/cache/rendus/<photo_id>/<etag>-<taille>.webp`). Ne régénère que les photos dont l'etag a changé ou dont un fichier manque. Japon : 98 photos en ~45 s, ~70 Mo.
+- `docker compose exec backend sh -c 'exiftool -q -a -s -gps:all /cache/rendus/*/*.webp'` : contrôle qu'aucun rendu ne contient de GPS (ne doit rien afficher)
+- API (lecture seule, `API_ACCES` dans `.env` : `prive-reseau` ou `connecte`) :
+  - `GET /api/voyages/` : voyages, dates, `nb_jours`, `nb_photos`, couverture (choisie, sinon premier favori, sinon première photo)
+  - `GET /api/voyages/<slug>/` : + récit d'intro (`recit_intro` et `recit_intro_html`), jours résumés, `trace` GPS allégé `[{lat, lon, jour}]`
+  - `GET /api/voyages/<slug>/jours/<AAAA-MM-JJ>/` : récit (Markdown + HTML), photos visibles dans l'ordre (`prise_le` avec le décalage du voyage), `precedent` / `suivant`
+  - `GET /api/voyages/<slug>/photos/` : toutes les photos visibles du voyage
+- Admin `/admin/` : Voyage (couverture en grille, jours restant à écrire), Jour (éditeur Markdown EasyMDE avec aperçu serveur, photos réordonnables par glisser-déposer sur la bande grise), Photo ; action « Régénérer les rendus » (lancée en arrière-plan, suivi dans `docker compose logs -f backend`).
 - Ajout d'une dépendance front : `docker compose exec frontend npm install <paquet>` puis `docker compose up -d --build frontend`
 - URL de dev : http://192.168.30.252:5173 (le proxy Vite relaie `/api` vers le backend)
 

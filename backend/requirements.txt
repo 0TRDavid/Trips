@@ -4,3 +4,6 @@ psycopg[binary]~=3.2
 Pillow~=11.3
 pillow-heif~=1.8
 requests~=2.32
+django-admin-sortable2~=2.4
+markdown-it-py~=4.3
+nh3~=0.3.8

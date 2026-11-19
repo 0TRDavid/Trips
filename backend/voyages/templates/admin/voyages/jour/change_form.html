@@ -1,0 +1,14 @@
+{% extends "admin/change_form.html" %}
+{% comment %}Formulaire d'un jour : liens vers le jour précédent et le suivant, pour écrire à la suite.{% endcomment %}
+{% block form_top %}
+  <nav class="navigation-jours" aria-label="Jours du voyage">
+    {% if jour_precedent %}
+      <a href="{% url 'admin:voyages_jour_change' jour_precedent.pk %}">← {{ jour_precedent.date|date:"l j F" }}{% if jour_precedent.titre %} · {{ jour_precedent.titre }}{% endif %}</a>
+    {% else %}<span class="vide">← premier jour</span>{% endif %}
+    <span aria-hidden="true">·</span>
+    {% if jour_suivant %}
+      <a href="{% url 'admin:voyages_jour_change' jour_suivant.pk %}">{{ jour_suivant.date|date:"l j F" }}{% if jour_suivant.titre %} · {{ jour_suivant.titre }}{% endif %} →</a>
+    {% else %}<span class="vide">dernier jour →</span>{% endif %}
+  </nav>
+  {{ block.super }}
+{% endblock %}

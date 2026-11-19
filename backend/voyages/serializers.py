@@ -1,16 +1,41 @@
-"""Sérialisation des photos pour le front (lecture seule).
+"""Sérialisation pour le front (lecture seule).
 
-Aucune coordonnée GPS n'est exposée ici ; la carte de l'étape 5 décidera ce
-qu'elle affiche.
+Aucune donnée sensible n'est exposée : ni chemin Nextcloud, ni etag, ni
+coordonnées par photo. Seul le tracé allégé du voyage contient des positions.
+
+Les récits sont renvoyés deux fois : en Markdown (la source) et en HTML
+nettoyé, produit par `voyages.markdown.rendre_markdown`, le même moteur que
+l'aperçu de l'admin.
+
+Les serializers ne déclenchent aucune requête : les vues leur passent des
+objets déjà chargés (annotations, prefetch, photos représentatives en contexte).
 """
+
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from rest_framework import serializers
 
-from .models import Photo
+from .markdown import rendre_markdown
+from .models import Jour, Photo, Voyage
+
+
+def _rendus(photo: Photo) -> dict:
+    # {"miniature": {"url": "/media/rendus/…", "largeur": 400, "hauteur": 267}, …}
+    # URL relative : elle passe par le même hôte que la page (proxy Vite, puis NPM).
+    return {
+        rendu.taille: {
+            "url": settings.MEDIA_URL + rendu.fichier,
+            "largeur": rendu.largeur,
+            "hauteur": rendu.hauteur,
+        }
+        for rendu in photo.rendus.all()
+    }
 
 
 class PhotoSerializer(serializers.ModelSerializer):
+    """Photos d'un voyage entier (GET /api/voyages/<slug>/photos/, étape 3)."""
+
     jour = serializers.DateField(source="jour.date")
     rendus = serializers.SerializerMethodField()
 
@@ -22,13 +47,143 @@ class PhotoSerializer(serializers.ModelSerializer):
         ]
 
     def get_rendus(self, photo):
-        # {"miniature": {"url": "/media/rendus/…", "largeur": 400, "hauteur": 267}, …}
-        # URL relative : elle passe par le même hôte que la page (proxy Vite, puis NPM).
-        return {
-            rendu.taille: {
-                "url": settings.MEDIA_URL + rendu.fichier,
-                "largeur": rendu.largeur,
-                "hauteur": rendu.hauteur,
-            }
-            for rendu in photo.rendus.all()
-        }
+        return _rendus(photo)
+
+
+class VignetteSerializer(serializers.ModelSerializer):
+    """Le minimum pour afficher une image et l'animer avant son chargement."""
+
+    rendus = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Photo
+        fields = ["id", "largeur", "hauteur", "couleur", "placeholder", "rendus"]
+
+    def get_rendus(self, photo):
+        return _rendus(photo)
+
+
+class PhotoDuJourSerializer(VignetteSerializer):
+    """Photo dans la page d'un jour : `prise_le` porte le décalage du voyage
+    (« 2025-06-01T14:03:00+09:00 ») : même instant que l'UTC stocké, mais
+    directement affichable en heure locale."""
+
+    prise_le = serializers.SerializerMethodField()
+
+    class Meta(VignetteSerializer.Meta):
+        fields = VignetteSerializer.Meta.fields + ["prise_le", "legende", "favori"]
+
+    def get_prise_le(self, photo):
+        return photo.prise_le.astimezone(self.context["fuseau"]).isoformat()
+
+
+def _vignette(photos: dict[int, Photo], photo_id: int | None):
+    photo = photos.get(photo_id)
+    return VignetteSerializer(photo).data if photo else None
+
+
+class JourResumeSerializer(serializers.ModelSerializer):
+    """Un jour dans la timeline d'un voyage. Attend les annotations
+    `nb_photos` et `photo_id`, et `context["photos"]` ({id: Photo})."""
+
+    nb_photos = serializers.IntegerField()
+    recit_rempli = serializers.SerializerMethodField()
+    photo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Jour
+        fields = ["date", "titre", "lieu", "nb_photos", "recit_rempli", "photo"]
+
+    def get_recit_rempli(self, jour):
+        return bool(jour.recit.strip())
+
+    def get_photo(self, jour):
+        return _vignette(self.context["photos"], jour.photo_id)
+
+
+class VoisinSerializer(serializers.ModelSerializer):
+    """Jour précédent ou suivant : de quoi préparer la transition animée."""
+
+    photo = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Jour
+        fields = ["date", "titre", "photo"]
+
+    def get_photo(self, jour):
+        return _vignette(self.context["photos"], jour.photo_id)
+
+
+class VoyageResumeSerializer(serializers.ModelSerializer):
+    """Un voyage sur la page d'accueil. Attend les annotations `nb_jours`,
+    `nb_photos` et `couverture_effective_id`, et `context["photos"]`."""
+
+    nb_jours = serializers.IntegerField()
+    nb_photos = serializers.IntegerField()
+    couverture = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Voyage
+        fields = ["slug", "titre", "date_debut", "date_fin", "fuseau_horaire", "nb_jours", "nb_photos", "couverture"]
+
+    def get_couverture(self, voyage):
+        return _vignette(self.context["photos"], voyage.couverture_effective_id)
+
+
+class VoyageDetailSerializer(VoyageResumeSerializer):
+    """Page d'un voyage. Attend en plus `context["jours"]` et `context["trace"]`."""
+
+    recit_intro_html = serializers.SerializerMethodField()
+    jours = serializers.SerializerMethodField()
+    trace = serializers.SerializerMethodField()
+
+    class Meta(VoyageResumeSerializer.Meta):
+        fields = VoyageResumeSerializer.Meta.fields + ["recit_intro", "recit_intro_html", "jours", "trace"]
+
+    def get_recit_intro_html(self, voyage):
+        return rendre_markdown(voyage.recit_intro)
+
+    def get_jours(self, voyage):
+        return JourResumeSerializer(self.context["jours"], many=True, context=self.context).data
+
+    def get_trace(self, voyage):
+        return self.context["trace"]
+
+
+class JourDetailSerializer(serializers.ModelSerializer):
+    """Page d'un jour. Attend `context["photos_du_jour"]`, `context["precedent"]`,
+    `context["suivant"]`, `context["photos"]` (vignettes des voisins) et
+    `context["fuseau"]`."""
+
+    voyage = serializers.SerializerMethodField()
+    recit_html = serializers.SerializerMethodField()
+    photos = serializers.SerializerMethodField()
+    precedent = serializers.SerializerMethodField()
+    suivant = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Jour
+        fields = ["date", "titre", "lieu", "recit", "recit_html", "voyage", "photos", "precedent", "suivant"]
+
+    def get_voyage(self, jour):
+        v = jour.voyage
+        return {"slug": v.slug, "titre": v.titre, "fuseau_horaire": v.fuseau_horaire}
+
+    def get_recit_html(self, jour):
+        return rendre_markdown(jour.recit)
+
+    def get_photos(self, jour):
+        return PhotoDuJourSerializer(self.context["photos_du_jour"], many=True, context=self.context).data
+
+    def _voisin(self, jour):
+        return VoisinSerializer(jour, context=self.context).data if jour else None
+
+    def get_precedent(self, jour):
+        return self._voisin(self.context["precedent"])
+
+    def get_suivant(self, jour):
+        return self._voisin(self.context["suivant"])
+
+
+def fuseau(voyage: Voyage) -> ZoneInfo:
+    return ZoneInfo(voyage.fuseau_horaire)

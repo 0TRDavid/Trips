@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "adminsortable2",
     "core",
     "voyages",
 ]
@@ -82,9 +83,16 @@ MEDIA_URL = "/media/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Accès à l'API (lecture seule dans tous les cas) : voir voyages/permissions.py.
+# « prive-reseau » tant que le site n'est joignable que par Tailscale ;
+# « connecte » pour exiger une session le jour où il sort sur internet.
+API_ACCES = os.environ.get("API_ACCES", "prive-reseau")
+
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"]
     + (["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else []),
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["voyages.permissions.LectureAPI"],
 }
 
 # Nextcloud : source des photos, lue en WebDAV et en lecture seule.
