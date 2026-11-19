@@ -11,6 +11,8 @@ export default defineConfig({
     // conteneur backend. Pas de CORS, pas d'URL d'API codée en dur.
     proxy: {
       "/api": "http://backend:8000",
+      // Rendus des photos (servis par Django en dev)
+      "/media": "http://backend:8000",
     },
   },
 });

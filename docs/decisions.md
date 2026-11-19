@@ -24,3 +24,19 @@ Format : date — choix — raison — alternatives écartées.
 - **`Voyage.dossier_nextcloud`** ajouté au modèle pour retrouver le voyage à la relance. **`Rendu`** reporté à l'étape 3.
 - **Orientation** : rotation qu'il reste à appliquer à l'image *décodée*. Pour un HEIC, libheif applique déjà la rotation et pillow-heif remet l'EXIF à 1 ; pour JPEG et CR2, valeur EXIF d'origine.
 - **Fichiers retenus** : `.heic .heif .jpg .jpeg .cr2` ; vidéos et autres fichiers ignorés et comptés (les vidéos arrivent en v2).
+
+## 2026-11-19 — Étape 3 (rendus)
+
+- **WebP en trois tailles** (côté long 400 / 1280 / 2560 px, qualité 75 / 80 / 82), jamais agrandis. Japon : 98 photos → 294 fichiers, **69,5 Mo** (miniatures 2,2 Mo, moyennes 17 Mo, grandes 52 Mo), **43 s** avec 4 processus. *Écarté pour l'instant :* AVIF (encodage bien plus lent, gain modeste à ces tailles) ; on pourra l'ajouter comme format supplémentaire sans toucher au modèle.
+- **Aucune métadonnée par construction** : les pixels sont recopiés dans une image neuve, et `save()` ne reçoit jamais `exif`, `xmp` ni `icc_profile` (Pillow ne les écrit dans un WebP que si on les lui passe). Vérifié par des tests (lecture Pillow, absence des blocs RIFF `EXIF`/`XMP `/`ICCP`, exiftool) et par exiftool sur tout le cache du Japon.
+- **Conversion en sRGB** via LittleCMS quand l'original a un profil ICC (Display P3 des iPhone), puisque le profil n'est pas conservé.
+- **CR2** : rendu à partir du JPEG pleine taille (5184×3456) qu'il embarque, que Pillow décode comme un TIFF. *Écarté :* rawpy/libraw (dépendance lourde, développement RAW inutile ici).
+- **Orientation** : `ImageOps.exif_transpose` pour JPEG et CR2 ; pour un HEIC, libheif applique la rotation au décodage. Vérifié sur les 32 photos tournées du Japon (90°, 180°, miroir).
+- **ThumbHash** pour le placeholder (~25 octets en base64), plutôt que BlurHash : il encode le ratio et rend mieux les dégradés. **Encodeur porté en Python dans `voyages/thumbhash.py`** (référence d'Evan Wallace, MIT), vérifié octet pour octet contre le paquet npm `thumbhash` qui le décodera côté front. *Écarté :* `thumbhash-python`, qui impose Pillow < 11.
+- **Couleur dominante** : couleur la plus fréquente après réduction à 5 couleurs (median cut) d'une vignette de 64 px.
+- **Modèle** : `largeur`, `hauteur`, `couleur`, `placeholder` et `rendus_etag` sur **Photo** (un par photo), et entité **Rendu** par taille (dimensions, octets, chemin). Écart avec le cadrage, qui mettait couleur et placeholder sur Rendu.
+- **Relance** : une photo est retraitée si `rendus_etag ≠ etag`, si un de ses fichiers manque, ou avec `--force`. L'etag (haché) est dans le nom du fichier : l'URL change quand l'original change, ce qui permet un cache navigateur `immutable`. Les anciens fichiers sont supprimés après une régénération réussie ; une photo illisible est signalée, et retentée à la prochaine relance.
+- **Parallélisme** : `ProcessPoolExecutor` (fork), un client WebDAV par processus. Les processus fils téléchargent en mémoire et écrivent les fichiers ; **seul le processus principal écrit en base**. *Écarté :* Celery (pas de besoin d'asynchrone tant que l'import est lancé à la main).
+- **API minimale** `GET /api/voyages/<slug>/photos/`, en lecture seule, sans coordonnées GPS ni chemin Nextcloud. L'étape 4 la complètera.
+- **Service des rendus** : en dev, Django (`static()` si DEBUG) et le proxy Vite `/media`. **Proposition pour la prod (étape 7, non implémentée)** : un conteneur `nginx:alpine` qui monte le volume `rendus` en lecture seule et sert `/media/` avec `Cache-Control: public, max-age=31536000, immutable` ; NPM route `/media/` vers lui et le reste vers le front et Django. Nginx plutôt que Caddy parce que NPM est déjà basé sur nginx : une seule syntaxe à connaître.
+- **exiftool dans l'image backend**, pour le test et le contrôle manuel. À réévaluer pour l'image de prod (étape 7).

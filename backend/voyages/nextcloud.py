@@ -173,3 +173,10 @@ class ClientWebDAV:
         if reponse.status_code >= 400:
             raise NextcloudErreur(f"Nextcloud a répondu {reponse.status_code} pour « {chemin} »")
         return reponse
+
+
+def client_depuis_settings() -> ClientWebDAV:
+    """Client configuré par les variables NEXTCLOUD_* du .env."""
+    from django.conf import settings
+
+    return ClientWebDAV(settings.NEXTCLOUD_URL, settings.NEXTCLOUD_USER, settings.NEXTCLOUD_PASSWORD)
