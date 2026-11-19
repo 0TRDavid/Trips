@@ -76,6 +76,10 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# Cache des rendus web (volume Docker « rendus ») : régénérable à tout moment.
+MEDIA_ROOT = Path(os.environ.get("RENDUS_DIR", "/cache"))
+MEDIA_URL = "/media/"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {

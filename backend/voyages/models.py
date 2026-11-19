@@ -67,9 +67,44 @@ class Photo(models.Model):
     ordre = models.IntegerField(default=0)
     favori = models.BooleanField(default=False)
     visible = models.BooleanField(default=True)
+    # Calculés à la génération des rendus : servent à réserver la place et à
+    # animer la page avant que l'image soit chargée.
+    largeur = models.PositiveIntegerField(null=True, blank=True, help_text="Orientation appliquée")
+    hauteur = models.PositiveIntegerField(null=True, blank=True, help_text="Orientation appliquée")
+    couleur = models.CharField(max_length=7, blank=True, help_text="Couleur dominante, #rrggbb")
+    placeholder = models.CharField(max_length=100, blank=True, help_text="ThumbHash en base64")
+    # Etag de l'original pour lequel les rendus ont été générés (vide : à faire).
+    rendus_etag = models.CharField(max_length=200, blank=True)
 
     class Meta:
         ordering = ["jour", "ordre", "prise_le"]
 
     def __str__(self):
         return self.chemin_nextcloud.rsplit("/", 1)[-1]
+
+
+class Rendu(models.Model):
+    """Version web d'une photo, sans métadonnées, dans le cache (MEDIA_ROOT)."""
+
+    class Taille(models.TextChoices):
+        MINIATURE = "miniature"
+        MOYENNE = "moyenne"
+        GRANDE = "grande"
+
+    photo = models.ForeignKey(Photo, on_delete=models.CASCADE, related_name="rendus")
+    taille = models.CharField(max_length=20, choices=Taille.choices)
+    format = models.CharField(max_length=10, default="webp")
+    largeur = models.PositiveIntegerField()
+    hauteur = models.PositiveIntegerField()
+    octets = models.PositiveIntegerField()
+    # Chemin relatif à MEDIA_ROOT : « rendus/42/3f9a…-moyenne.webp ».
+    fichier = models.CharField(max_length=300)
+
+    class Meta:
+        ordering = ["photo", "largeur"]
+        constraints = [
+            models.UniqueConstraint(fields=["photo", "taille"], name="rendu_unique_par_taille")
+        ]
+
+    def __str__(self):
+        return self.fichier

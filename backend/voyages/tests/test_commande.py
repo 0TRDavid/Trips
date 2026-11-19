@@ -7,11 +7,13 @@ from django.test import TestCase, override_settings
 
 from voyages.models import Voyage
 
+from .fabrique import CacheTemporaire
 from .test_importation import FauxClient, photo_tokyo
 
 
-class CommandeTests(TestCase):
+class CommandeTests(CacheTemporaire, TestCase):
     def setUp(self):
+        super().setUp()
         get_user_model().objects.create_superuser("dd", password="x")
         self.client_nc = FauxClient(
             {"a.HEIC": ("1", photo_tokyo("09:00:00")), "b.jpg": ("2", photo_tokyo("10:00:00"))},

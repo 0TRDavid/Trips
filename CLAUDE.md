@@ -164,6 +164,8 @@ priorité n°1.
 - Tests obligatoires pour l'import et l'extraction des métadonnées.
 - N'accède à aucune machine du réseau en dehors de Nextcloud.
 - Animations : respecte `prefers-reduced-motion`.
+- Rendus : WebP générés par `voyages/rendus.py`, jamais d'EXIF/XMP/ICC passés à `save()` ; le cache est régénérable, seule la base est irremplaçable.
+- Après un changement de `vite.config.ts` : `docker compose restart frontend`.
 
 ## Commandes
 - `cp .env.example .env` : première fois seulement, puis changer les secrets
@@ -173,6 +175,10 @@ priorité n°1.
 - `docker compose exec frontend npm run build` : vérification TypeScript + build (puis supprimer `frontend/dist`)
 - `docker compose exec backend python manage.py createsuperuser` : compte admin (`/admin/`)
 - `docker compose exec backend python manage.py import_voyage "<dossier>" --fuseau Asia/Tokyo [--horloge "Canon EOS 100D=UTC"] [--titre ...] [--limite N] [--dry-run]` : importe ou réimporte un dossier Nextcloud (chemin depuis la racine de l'utilisateur, ex. `/Shared/Japon …`). Relançable sans doublons ; `--fuseau` seulement au premier import ; le rapport final compare Nextcloud et la base.
+  Génère ensuite les rendus web du voyage (sauf `--sans-rendus`).
+- `docker compose exec backend python manage.py generer_rendus [--voyage <slug>] [--force] [--processus N] [--dry-run]` : rendus WebP (400 / 1280 / 2560 px, sans métadonnées) dans le volume `rendus` (`/cache/rendus/<photo_id>/<etag>-<taille>.webp`). Ne régénère que les photos dont l'etag a changé ou dont un fichier manque. Japon : 98 photos en ~45 s, ~70 Mo.
+- `docker compose exec backend sh -c 'exiftool -a -s -gps:all /cache/rendus/*/*.webp'` : contrôle qu'aucun rendu ne contient de GPS (ne doit rien afficher)
+- API : `GET /api/voyages/<slug>/photos/` (photos visibles, dimensions, couleur, ThumbHash, URL des rendus en `/media/…`)
 - Ajout d'une dépendance front : `docker compose exec frontend npm install <paquet>` puis `docker compose up -d --build frontend`
 - URL de dev : http://192.168.30.252:5173 (le proxy Vite relaie `/api` vers le backend)
 

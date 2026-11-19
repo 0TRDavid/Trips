@@ -17,6 +17,8 @@ services:
     command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./backend:/app
+      # Cache des rendus web (régénérable, jamais les originaux)
+      - rendus:/cache
     ports:
       - "8000:8000"
     depends_on:
@@ -37,3 +39,4 @@ services:
 
 volumes:
   pgdata:
+  rendus:

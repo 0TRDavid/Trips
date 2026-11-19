@@ -1,17 +1,16 @@
 """python manage.py import_voyage "<dossier Nextcloud>" [--fuseau Asia/Tokyo] ..."""
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
+from voyages.generation import generer_rendus, photos_a_traiter
 from voyages.importation import ImportErreur, importer_voyage
-from voyages.nextcloud import ClientWebDAV, NextcloudErreur
+from voyages.management.commands.generer_rendus import afficher_rapport_rendus
+from voyages.nextcloud import NextcloudErreur, client_depuis_settings
 
 
-def creer_client() -> ClientWebDAV:
-    return ClientWebDAV(
-        settings.NEXTCLOUD_URL, settings.NEXTCLOUD_USER, settings.NEXTCLOUD_PASSWORD
-    )
+def creer_client():
+    return client_depuis_settings()
 
 
 class Command(BaseCommand):
@@ -29,6 +28,7 @@ class Command(BaseCommand):
         )
         parser.add_argument("--limite", type=int, help="N'importe que les N premières photos (test)")
         parser.add_argument("--dry-run", action="store_true", help="Affiche ce qui serait fait, sans rien écrire ni télécharger")
+        parser.add_argument("--sans-rendus", action="store_true", help="Ne génère pas les rendus web (voir generer_rendus)")
 
     def handle(self, *args, **options):
         try:
@@ -46,6 +46,23 @@ class Command(BaseCommand):
         except (ImportErreur, NextcloudErreur) as exc:
             raise CommandError(str(exc)) from None
         self._afficher(rapport)
+        if not options["sans_rendus"]:
+            self._rendus(rapport)
+
+    def _rendus(self, rapport):
+        if rapport.voyage is None:  # premier import simulé : rien en base
+            self.stdout.write(f"Rendus web à générer : {rapport.creees}")
+            return
+        if rapport.dry_run:
+            a_faire, _ = photos_a_traiter(rapport.voyage)
+            self.stdout.write(f"Rendus web à générer : {len(a_faire) + rapport.creees + rapport.mises_a_jour} (au plus)")
+            return
+        self.stdout.write("")
+        self.stdout.write(self.style.MIGRATE_HEADING("Rendus web"))
+        rapport_rendus = generer_rendus(
+            fabrique_client=creer_client, voyage=rapport.voyage, progression=self._progression,
+        )
+        afficher_rapport_rendus(self, rapport_rendus)
 
     def _horloges(self, valeurs):
         horloges = {}
