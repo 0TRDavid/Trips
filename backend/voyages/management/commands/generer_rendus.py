@@ -40,6 +40,9 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--voyage", help="Slug du voyage (par défaut : tous)")
+        parser.add_argument(
+            "--photos", help="Identifiants de photos séparés par des virgules (action de l'admin)"
+        )
         parser.add_argument("--force", action="store_true", help="Régénère tout, même les rendus à jour")
         parser.add_argument(
             "--processus", type=int, default=PROCESSUS_PAR_DEFAUT,
@@ -55,12 +58,19 @@ class Command(BaseCommand):
             except Voyage.DoesNotExist:
                 slugs = ", ".join(Voyage.objects.values_list("slug", flat=True)) or "aucun"
                 raise CommandError(f"Voyage inconnu : « {options['voyage']} » (existants : {slugs})") from None
+        photos_ids = None
+        if options["photos"]:
+            try:
+                photos_ids = [int(i) for i in options["photos"].split(",") if i.strip()]
+            except ValueError:
+                raise CommandError("--photos attend des identifiants séparés par des virgules") from None
         if options["processus"] < 1:
             raise CommandError("--processus doit valoir au moins 1")
         try:
             rapport = generer_rendus(
                 fabrique_client=creer_client,
                 voyage=voyage,
+                photos_ids=photos_ids,
                 force=options["force"],
                 processus=options["processus"],
                 dry_run=options["dry_run"],

@@ -202,13 +202,24 @@ def _importer_photo(client, voyage, tz, horloges_tz, fichier: FichierDistant, ph
         )
         if photo is None:
             # Sans date fiable, la photo est masquée en attendant une décision dans l'admin.
-            Photo.objects.create(chemin_nextcloud=fichier.chemin, visible=not sans_date, **champs)
+            Photo.objects.create(
+                chemin_nextcloud=fichier.chemin, visible=not sans_date, ordre=_ordre_suivant(jour), **champs
+            )
             rapport.creees += 1
         else:
+            if photo.jour_id != jour.id:
+                # Elle change de jour (horloge corrigée) : elle se range à la fin du nouveau jour.
+                champs["ordre"] = _ordre_suivant(jour)
             for nom, valeur in champs.items():
                 setattr(photo, nom, valeur)
             photo.save(update_fields=list(champs))
             rapport.mises_a_jour += 1
+
+
+def _ordre_suivant(jour: Jour) -> int:
+    """Rang d'une photo ajoutée à un jour : après les autres, sans toucher à leur ordre."""
+    dernier = jour.photos.aggregate(m=Max("ordre"))["m"]
+    return (dernier or 0) + 1
 
 
 def _mettre_a_jour_dates(voyage: Voyage):

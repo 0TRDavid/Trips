@@ -62,11 +62,15 @@ def rendus_a_jour(photo: Photo, racine: Path) -> bool:
     return all((racine / r.fichier).is_file() for r in rendus)
 
 
-def photos_a_traiter(voyage: Voyage | None = None, force: bool = False) -> tuple[list[Photo], int]:
+def photos_a_traiter(
+    voyage: Voyage | None = None, force: bool = False, photos_ids: list[int] | None = None
+) -> tuple[list[Photo], int]:
     """Renvoie (photos à (re)générer, nombre total de photos concernées)."""
     photos = Photo.objects.prefetch_related("rendus").order_by("id")
     if voyage is not None:
         photos = photos.filter(jour__voyage=voyage)
+    if photos_ids is not None:
+        photos = photos.filter(id__in=photos_ids)
     photos = list(photos)
     racine = racine_cache()
     a_faire = photos if force else [p for p in photos if not rendus_a_jour(p, racine)]
@@ -77,6 +81,7 @@ def generer_rendus(
     *,
     fabrique_client: Callable[[], object],
     voyage: Voyage | None = None,
+    photos_ids: list[int] | None = None,
     force: bool = False,
     processus: int | None = None,
     dry_run: bool = False,
@@ -88,7 +93,7 @@ def generer_rendus(
     processus (une connexion HTTP ne se partage pas entre processus).
     """
     debut = time.monotonic()
-    a_faire, total = photos_a_traiter(voyage, force)
+    a_faire, total = photos_a_traiter(voyage, force, photos_ids)
     rapport = RapportRendus(photos=total, inchangees=total - len(a_faire), dry_run=dry_run)
     if dry_run:
         rapport.generees = len(a_faire)

@@ -1,0 +1,9 @@
+<label class="choix-couverture__option{% if not widget.miniature %} choix-couverture__option--aucune{% endif %}"{% if widget.photo %} title="{{ widget.photo }} — {{ widget.photo.jour.date|date:'j F' }}"{% endif %}>
+  <input type="{{ widget.type }}" name="{{ widget.name }}"{% if widget.value != None %} value="{{ widget.value|stringformat:'s' }}"{% endif %}{% include "django/forms/widgets/attrs.html" %}>
+  {% if widget.miniature %}
+    <img src="{{ widget.miniature }}" alt="{{ widget.label }}" loading="lazy" decoding="async"{% if widget.photo.couleur %} style="background:{{ widget.photo.couleur }}"{% endif %}>
+    {% if widget.photo.favori %}<span class="choix-couverture__favori" aria-label="favori">★</span>{% endif %}
+  {% else %}
+    <span>{% if widget.photo %}{{ widget.label }}<br><small>(sans rendu)</small>{% else %}Automatique<br><small>premier favori, sinon première photo</small>{% endif %}</span>
+  {% endif %}
+</label>
