@@ -165,8 +165,14 @@ priorité n°1.
 - Animations : respecte `prefers-reduced-motion`.
 
 ## Commandes
-- `docker compose up -d` : lance l'environnement de dev
-- (à compléter au fil des étapes)
+- `cp .env.example .env` : première fois seulement, puis changer les secrets
+- `docker compose up -d --build` : lance l'environnement de dev (db, backend :8000, frontend :5173)
+- `docker compose logs -f backend` (ou `frontend`) : suivre les logs
+- `docker compose exec backend python manage.py test` : tests backend
+- `docker compose exec frontend npm run build` : vérification TypeScript + build (puis supprimer `frontend/dist`)
+- `docker compose exec backend python manage.py createsuperuser` : compte admin (`/admin/`)
+- Ajout d'une dépendance front : `docker compose exec frontend npm install <paquet>` puis `docker compose up -d --build frontend`
+- URL de dev : http://192.168.30.252:5173 (le proxy Vite relaie `/api` vers le backend)
 
 ## Décisions
 Consigne chaque décision structurante dans `docs/decisions.md`
