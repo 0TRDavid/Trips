@@ -1,0 +1,61 @@
+.galerie {
+  /* 110 px : deux paysages 4:3 tiennent côte à côte sur un téléphone de 375 px. */
+  --h: 110px;
+  --espace: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espace);
+}
+
+@media (min-width: 700px) {
+  .galerie {
+    --h: 260px;
+    --espace: 6px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .galerie {
+    --h: 320px;
+  }
+}
+
+/* La dernière rangée garde sa hauteur au lieu de s'étirer sur toute la largeur. */
+.galerie::after {
+  content: "";
+  flex-grow: 1000000000;
+}
+
+.cellule {
+  /* × 100 : si la somme des flex-grow d'une rangée est < 1 (un portrait
+     seul), le navigateur ne distribue qu'une fraction de l'espace libre. */
+  flex-grow: calc(var(--ratio) * 100);
+  flex-basis: calc(var(--ratio) * var(--h));
+  min-width: 0;
+  aspect-ratio: var(--ratio);
+}
+
+.lien {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.lien:focus-visible {
+  outline-offset: -3px;
+}
+
+.favori {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  color: #fff;
+  font-size: 0.9rem;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+  pointer-events: none;
+}

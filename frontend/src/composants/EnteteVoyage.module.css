@@ -1,0 +1,41 @@
+.entete {
+  padding: 0 var(--marge);
+  max-width: var(--largeur-max);
+  width: 100%;
+  margin: 0 auto;
+}
+
+.visuel {
+  position: relative;
+  height: clamp(320px, 62vh, 720px);
+  border-radius: var(--rayon);
+  overflow: hidden;
+  background: var(--papier-2);
+}
+
+.voile {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0) 55%);
+  pointer-events: none;
+}
+
+.texte {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  color: #fff;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.titre {
+  font-size: clamp(2.6rem, 9vw, 6rem);
+}
+
+.meta {
+  font-size: clamp(0.95rem, 2vw, 1.1rem);
+  opacity: 0.9;
+}

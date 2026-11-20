@@ -1,0 +1,52 @@
+.site {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.entete {
+  width: 100%;
+  max-width: var(--largeur-max);
+  margin: 0 auto;
+  padding: 0.9rem var(--marge);
+  display: flex;
+  align-items: center;
+}
+
+.marque {
+  font-family: var(--police-titre);
+  font-size: 1.05rem;
+  font-style: italic;
+  text-decoration: none;
+  color: var(--encre-2);
+}
+
+.marque:hover {
+  color: var(--encre);
+}
+
+.contenu {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.evitement {
+  position: absolute;
+  left: -9999px;
+}
+
+.evitement:focus {
+  left: 1rem;
+  top: 1rem;
+  z-index: 100;
+  background: var(--papier);
+  padding: 0.5rem 1rem;
+}

@@ -1,0 +1,68 @@
+.nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  border-top: 1px solid var(--filet);
+  padding-top: 1.5rem;
+}
+
+.voisin {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.voisin[data-sens="suivant"] {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.vignette {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--papier-2);
+}
+
+.texte {
+  display: grid;
+  min-width: 0;
+}
+
+.sens {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--encre-3);
+}
+
+.voisin:hover .sens {
+  color: var(--accent);
+}
+
+.titre {
+  font-family: var(--police-titre);
+  font-size: 1.15rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.date {
+  font-size: 0.85rem;
+  color: var(--encre-2);
+}
+
+/* Téléphone : pas la place pour la vignette à côté du texte. */
+@media (max-width: 559px) {
+  .vignette {
+    display: none;
+  }
+
+  .titre {
+    font-size: 1rem;
+  }
+}

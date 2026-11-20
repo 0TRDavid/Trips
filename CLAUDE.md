@@ -170,13 +170,16 @@ priorité n°1.
 - Markdown : un seul moteur, `voyages/markdown.py: rendre_markdown()` (API, aperçu admin, futur export). Le HTML écrit dans un récit n'est jamais interprété.
 - API en lecture seule, sans N+1 : chaque endpoint a un nombre de requêtes fixe, vérifié par `NombreDeRequetesTests` (à mettre à jour si on ajoute une requête). Jamais de chemin Nextcloud, d'etag ni de coordonnées par photo dans l'API.
 - Voyages, jours et photos naissent de l'import : l'admin ne les crée ni ne les supprime.
+- Front : toute photo passe par `composants/Photo.tsx` (srcset, ratio réservé, couleur + ThumbHash). URL construites par `lib/chemins.ts`. Éléments partagés entre pages marqués `data-transition-id` via `lib/transitions.ts`.
+- Carte : MapLibre + OpenFreeMap, chargée en lazy ; ne pas retirer `setWorkerUrl` dans `CarteParcours.tsx`.
 
 ## Commandes
 - `cp .env.example .env` : première fois seulement, puis changer les secrets
 - `docker compose up -d --build` : lance l'environnement de dev (db, backend :8000, frontend :5173)
 - `docker compose logs -f backend` (ou `frontend`) : suivre les logs
 - `docker compose exec backend python manage.py test` : tests backend
-- `docker compose exec frontend npm run build` : vérification TypeScript + build (puis supprimer `frontend/dist`)
+- `docker compose exec frontend npm run build` : vérification TypeScript + build (puis `docker compose exec frontend rm -rf dist`, le dossier appartient à root)
+- `docker compose exec frontend npm test` : tests Vitest du front (logique pure : srcset, dates, carte, glissement)
 - `docker compose exec backend python manage.py createsuperuser` : compte admin (`/admin/`)
 - `docker compose exec backend python manage.py import_voyage "<dossier>" --fuseau Asia/Tokyo [--horloge "Canon EOS 100D=UTC"] [--titre ...] [--limite N] [--dry-run]` : importe ou réimporte un dossier Nextcloud (chemin depuis la racine de l'utilisateur, ex. `/Shared/Japon …`). Relançable sans doublons ; `--fuseau` seulement au premier import ; le rapport final compare Nextcloud et la base.
   Génère ensuite les rendus web du voyage (sauf `--sans-rendus`).
@@ -190,6 +193,7 @@ priorité n°1.
 - Admin `/admin/` : Voyage (couverture en grille, jours restant à écrire), Jour (éditeur Markdown EasyMDE avec aperçu serveur, photos réordonnables par glisser-déposer sur la bande grise), Photo ; action « Régénérer les rendus » (lancée en arrière-plan, suivi dans `docker compose logs -f backend`).
 - Ajout d'une dépendance front : `docker compose exec frontend npm install <paquet>` puis `docker compose up -d --build frontend`
 - URL de dev : http://192.168.30.252:5173 (le proxy Vite relaie `/api` vers le backend)
+- Routes du front : `/`, `/voyages/<slug>`, `/voyages/<slug>/jours/<date>`, `/voyages/<slug>/jours/<date>/photos/<id>` (visionneuse = route enfant du jour), 404 sinon
 
 ## Décisions
 Consigne chaque décision structurante dans `docs/decisions.md`
