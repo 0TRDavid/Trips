@@ -6,8 +6,11 @@ fichier en mémoire (GET). Rien n'est jamais écrit dans Nextcloud ni sur disque
 
 from __future__ import annotations
 
+import base64
 import posixpath
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate_to_datetime
@@ -19,6 +22,8 @@ from urllib3.util.retry import Retry
 
 # .cr2 : RAW Canon (TIFF), dont Pillow lit les EXIF.
 EXTENSIONS_IMAGES = {".heic", ".heif", ".jpg", ".jpeg", ".cr2"}
+# Vidéos (Samsung .mp4, iPhone .mov) : lues en flux par ffmpeg, jamais téléchargées.
+EXTENSIONS_VIDEOS = {".mp4", ".mov"}
 
 DAV = "{DAV:}"
 CORPS_PROPFIND = """<?xml version="1.0" encoding="utf-8"?>
@@ -52,6 +57,14 @@ class FichierDistant:
     @property
     def est_image(self) -> bool:
         return not self.est_dossier and self.extension in EXTENSIONS_IMAGES
+
+    @property
+    def est_video(self) -> bool:
+        return not self.est_dossier and self.extension in EXTENSIONS_VIDEOS
+
+    @property
+    def est_media(self) -> bool:
+        return self.est_image or self.est_video
 
 
 def normaliser(chemin: str) -> str:
@@ -110,6 +123,7 @@ class ClientWebDAV:
                 "NEXTCLOUD_URL, NEXTCLOUD_USER et NEXTCLOUD_PASSWORD doivent être définis dans .env"
             )
         self.racine = f"{url.rstrip('/')}/remote.php/dav/files/{quote(utilisateur)}/"
+        self._jeton = base64.b64encode(f"{utilisateur}:{mot_de_passe}".encode()).decode()
         self.prefixe_dav = unquote(urlparse(self.racine).path)
         self.timeout = timeout
         self.session = requests.Session()
@@ -148,6 +162,22 @@ class ClientWebDAV:
         headers = {"Range": f"bytes=0-{limite - 1}"} if limite else {}
         reponse = self._requete("GET", chemin, headers=headers)
         return reponse.content
+
+    @contextmanager
+    def entree_video(self, chemin: str) -> Iterator["Entree"]:
+        """Entrée de ffmpeg/ffprobe : le fichier lu en flux sur WebDAV.
+
+        ffmpeg fait ses propres requêtes Range (il saute à la boîte `moov`
+        sans tout télécharger) ; rien n'est écrit sur disque. L'en-tête
+        d'authentification n'est visible que des processus du conteneur.
+        """
+        from .video import Entree
+
+        yield Entree(args=(
+            "-headers", f"Authorization: Basic {self._jeton}\r\n",
+            "-reconnect", "1", "-reconnect_on_network_error", "1",
+            "-i", self.url(chemin),
+        ))
 
     def _propfind(self, dossier: str) -> list[FichierDistant]:
         url = self.url(dossier)

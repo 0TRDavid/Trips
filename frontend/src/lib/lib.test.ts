@@ -4,6 +4,7 @@ import { decisionGlissement } from "../hooks/useGlissement";
 import { cadrageJour, ligneTrace } from "./carte";
 import { dateCourte, dateLongue, estDateJour, heureLocale, libelleHeure, momentsParHeure, numeroJour, periode } from "./dates";
 import { ratio, srcParDefaut, srcset } from "./rendus";
+import { aUneVideo, formatDuree, sourceVideo } from "./videos";
 
 const photo: PhotoResume = {
   id: 14,
@@ -130,5 +131,35 @@ describe("moments de la journée", () => {
     expect(libelleHeure(9)).toBe("9 h");
     expect(libelleHeure(0)).toBe("0 h");
     expect(libelleHeure(null)).toBe("Heure inconnue");
+  });
+});
+
+describe("vidéos", () => {
+  const videos = {
+    "720": { url: "/m/v-720.mp4", largeur: 720, hauteur: 1280 },
+    "1080": { url: "/m/v-1080.mp4", largeur: 1080, hauteur: 1920 },
+  };
+  it("prend le 720p tant qu'il suffit, le 1080p au-delà", () => {
+    expect(sourceVideo({ videos }, 320)?.url).toBe("/m/v-720.mp4"); // vignette
+    expect(sourceVideo({ videos }, 320, 2)?.url).toBe("/m/v-720.mp4"); // vignette sur écran Retina
+    expect(sourceVideo({ videos }, 400, 2)?.url).toBe("/m/v-1080.mp4"); // téléphone en plein écran
+    expect(sourceVideo({ videos }, 1080)?.url).toBe("/m/v-1080.mp4"); // ordinateur en plein écran
+  });
+  it("se replie sur le seul rendu d'une petite source", () => {
+    expect(sourceVideo({ videos: { "720": videos["720"] } }, 1080)?.url).toBe("/m/v-720.mp4");
+    expect(sourceVideo({ videos: {} }, 300)).toBeUndefined();
+  });
+  it("formate les durées", () => {
+    expect(formatDuree(3.14)).toBe("0:03");
+    expect(formatDuree(54.12)).toBe("0:54");
+    expect(formatDuree(65)).toBe("1:05");
+    expect(formatDuree(3725)).toBe("1:02:05");
+    expect(formatDuree(null)).toBe("");
+    expect(formatDuree(Number.NaN)).toBe("");
+  });
+  it("sait si un média a une vidéo à lire", () => {
+    expect(aUneVideo({ type: "photo", videos: {} })).toBe(false);
+    expect(aUneVideo({ type: "animee", videos })).toBe(true);
+    expect(aUneVideo({ type: "video", videos: {} })).toBe(false); // rendus pas encore générés
   });
 });

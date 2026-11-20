@@ -41,6 +41,12 @@ def creer_photo(jour, n, *, heure=None, ordre=None, gps=None, **champs):
             photo=photo, taille=taille, largeur=cote, hauteur=cote * 2 // 3, octets=1000,
             fichier=f"rendus/{photo.pk}/abc-{taille}.webp",
         )
+    if photo.type != Photo.Type.PHOTO:  # photo animée ou vidéo : ses MP4
+        for taille, cote in (("video_720", 720), ("video_1080", 1080)):
+            Rendu.objects.create(
+                photo=photo, taille=taille, format="mp4", largeur=cote * 3 // 2, hauteur=cote, octets=5000,
+                fichier=f"rendus/{photo.pk}/abc-{taille}.mp4",
+            )
     return photo
 
 

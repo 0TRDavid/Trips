@@ -36,6 +36,7 @@ class Metadonnees:
     altitude: float | None = None
     appareil: str = ""
     orientation: int | None = None
+    duree: float | None = None  # vidéos seulement, en secondes
 
 
 def extraire_metadonnees(
@@ -55,7 +56,7 @@ def extraire_metadonnees(
     ifd_exif = _ifd(exif, ExifTags.IFD.Exif)
     ifd_gps = _ifd(exif, ExifTags.IFD.GPSInfo)
     latitude, longitude = _coordonnees(ifd_gps)
-    appareil = _appareil(exif.get(MAKE), exif.get(MODEL))
+    appareil = nom_appareil(exif.get(MAKE), exif.get(MODEL))
     horloge = (horloges or {}).get(appareil, fuseau)
     return Metadonnees(
         prise_le=_date_prise(exif, ifd_exif, horloge),
@@ -162,7 +163,7 @@ def _altitude(gps: dict) -> float | None:
 
 # --- Appareil et orientation ---------------------------------------------
 
-def _appareil(marque, modele) -> str:
+def nom_appareil(marque, modele) -> str:
     marque, modele = _texte(marque), _texte(modele)
     if marque and modele.lower().startswith(marque.lower()):
         return modele

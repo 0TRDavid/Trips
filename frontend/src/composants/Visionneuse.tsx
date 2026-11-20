@@ -1,12 +1,16 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { PhotoJour } from "../api/types";
 import { useGlissement } from "../hooks/useGlissement";
+import { useMouvementReduit } from "../hooks/useMouvementReduit";
 import { useTouchesClavier } from "../hooks/useTouchesClavier";
 import { dateCourte, heureLocale } from "../lib/dates";
 import { srcset } from "../lib/rendus";
 import { idPhoto } from "../lib/transitions";
+import { aUneVideo, formatDuree } from "../lib/videos";
+import LecteurVideo from "./LecteurVideo";
 import Photo from "./Photo";
+import PhotoAnimee from "./PhotoAnimee";
 import styles from "./Visionneuse.module.css";
 
 type Props = {
@@ -34,6 +38,12 @@ export default function Visionneuse({ photos, index, date, precedent, suivant, f
   const aSuivant = index >= 0 && index < photos.length - 1;
   const boutonFermer = useRef<HTMLButtonElement>(null);
   const dialogue = useRef<HTMLDivElement>(null);
+  const mouvementReduit = useMouvementReduit();
+  // « Réduire les animations » : une photo animée reste fixe ; le bouton
+  // « Animer » la joue une fois (chaque clic remonte le composant, donc rejoue).
+  // Le compteur est lié à la photo : on repart de zéro en changeant de photo.
+  const [animations, setAnimations] = useState({ id: -1, n: 0 });
+  const nbAnimations = animations.id === photo?.id ? animations.n : 0;
 
   useTouchesClavier({
     Escape: fermer,
@@ -67,7 +77,9 @@ export default function Visionneuse({ photos, index, date, precedent, suivant, f
   // Garde le focus clavier (Tab) à l'intérieur de la visionneuse.
   const pieger = (e: ReactKeyboardEvent) => {
     if (e.key !== "Tab" || !dialogue.current) return;
-    const focusables = [...dialogue.current.querySelectorAll<HTMLElement>("button:not(:disabled), a[href]")];
+    const focusables = [
+      ...dialogue.current.querySelectorAll<HTMLElement>("button:not(:disabled), a[href], video[controls]"),
+    ];
     if (focusables.length === 0) return;
     const premier = focusables[0];
     const dernier = focusables[focusables.length - 1];
@@ -80,7 +92,10 @@ export default function Visionneuse({ photos, index, date, precedent, suivant, f
     }
   };
 
-  const libelle = photo ? `Photo ${index + 1} sur ${photos.length}` : "Photo introuvable";
+  const nature = photo?.type === "video" ? "Vidéo" : "Photo";
+  const libelle = photo ? `${nature} ${index + 1} sur ${photos.length}` : "Photo introuvable";
+  const alt = photo ? photo.legende || `${nature} du ${dateCourte(date)}` : "";
+  const animee = photo?.type === "animee" && aUneVideo(photo);
 
   return (
     <div
@@ -93,20 +108,43 @@ export default function Visionneuse({ photos, index, date, precedent, suivant, f
     >
       <div className={styles.barre}>
         <span className={styles.compteur}>{photo ? `${index + 1} / ${photos.length}` : ""}</span>
+        {animee && mouvementReduit && (
+          <button
+            type="button"
+            className={styles.animer}
+            onClick={() => setAnimations({ id: photo.id, n: nbAnimations + 1 })}
+          >
+            Animer
+          </button>
+        )}
         <button ref={boutonFermer} type="button" className={styles.fermer} onClick={fermer} aria-label="Fermer (Échap)">
           ✕
         </button>
       </div>
 
       <div className={styles.scene} {...glissement}>
-        {photo ? (
+        {photo?.type === "video" ? (
+          <LecteurVideo key={photo.id} photo={photo} alt={alt} transitionId={idPhoto(photo.id)} />
+        ) : animee ? (
+          <PhotoAnimee
+            key={`${photo.id}-${nbAnimations}`}
+            photo={photo}
+            mode="contenir"
+            sizes="100vw"
+            priorite
+            alt={alt}
+            transitionId={idPhoto(photo.id)}
+            petitCote={Math.min(window.innerWidth, window.innerHeight)}
+            forcer={nbAnimations > 0}
+          />
+        ) : photo ? (
           <Photo
             key={photo.id}
             photo={photo}
             mode="contenir"
             sizes="100vw"
             priorite
-            alt={photo.legende || `Photo du ${dateCourte(date)}`}
+            alt={alt}
             transitionId={idPhoto(photo.id)}
           />
         ) : (
@@ -131,6 +169,7 @@ export default function Visionneuse({ photos, index, date, precedent, suivant, f
             <p className={styles.quand}>
               {dateCourte(date)}
               {photo.prise_le && ` · ${heureLocale(photo.prise_le)}`}
+              {photo.type === "video" && photo.duree != null && ` · vidéo ${formatDuree(photo.duree)}`}
               {photo.photographe && ` · ${photo.photographe}`}
               {photo.favori && " · ★"}
             </p>

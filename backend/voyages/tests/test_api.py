@@ -137,11 +137,30 @@ class DetailJourTests(TestCase):
         photo = d["photos"][0]
         self.assertEqual(
             set(photo),
-            {"id", "largeur", "hauteur", "couleur", "placeholder", "rendus", "prise_le", "legende", "favori", "photographe"},
+            {"id", "largeur", "hauteur", "couleur", "placeholder", "rendus", "prise_le", "legende", "favori",
+             "photographe", "type", "duree", "videos"},
         )
+        self.assertEqual((photo["type"], photo["duree"], photo["videos"]), ("photo", None, {}))
         self.assertEqual(photo["photographe"], "")
         self.assertEqual((photo["largeur"], photo["hauteur"], photo["couleur"]), (3000, 2000, "#336699"))
         self.assertEqual(photo["rendus"]["moyenne"]["url"], f"/media/rendus/{photo['id']}/abc-moyenne.webp")
+
+    def test_video_et_photo_animee(self):
+        creer_photo(self.jour, 5, type=Photo.Type.VIDEO, duree=54.12)
+        creer_photo(self.jour, 6, type=Photo.Type.ANIMEE, duree=3.14)
+
+        photos = {p["type"]: p for p in self.get().json()["photos"]}
+
+        video = photos["video"]
+        self.assertEqual(video["duree"], 54.12)
+        self.assertEqual(video["videos"], {
+            "720": {"url": f"/media/rendus/{video['id']}/abc-video_720.mp4", "largeur": 1080, "hauteur": 720},
+            "1080": {"url": f"/media/rendus/{video['id']}/abc-video_1080.mp4", "largeur": 1620, "hauteur": 1080},
+        })
+        # L'aperçu (poster) : les rendus WebP, sans les MP4.
+        self.assertEqual(set(video["rendus"]), {"miniature", "moyenne", "grande"})
+        self.assertEqual(set(photos["animee"]["videos"]), {"720", "1080"})
+        self.assertEqual(photos["animee"]["duree"], 3.14)
 
     def test_prise_le_dans_le_fuseau_du_voyage(self):
         # Photo 1 du 2 juin : 01:00 UTC → 10:00 à Tokyo.
@@ -190,6 +209,25 @@ class DetailJourTests(TestCase):
         self.assertEqual(suivant["date"], "2025-06-03")
         self.assertIsNone(suivant["photo"])
 
+    def test_jour_sans_media_visible_ni_recit_absent_du_site(self):
+        # Photos WhatsApp sans date : masquées, rangées à la date du fichier.
+        cache = Jour.objects.create(voyage=self.voyage, date=date(2025, 6, 12))
+        creer_photo(cache, 1, visible=False)
+        dernier = self.voyage.jours.get(date=date(2025, 6, 3))
+
+        detail = self.client.get("/api/voyages/japon-2025/").json()
+        self.assertNotIn("2025-06-12", [j["date"] for j in detail["jours"]])
+        self.assertEqual(detail["nb_jours"], 3)
+        self.assertEqual(self.client.get("/api/voyages/").json()[0]["nb_jours"], 3)
+        self.assertIsNone(self.get("2025-06-03").json()["suivant"])
+        self.assertEqual(self.get("2025-06-12").status_code, 404)
+
+        # Un récit écrit suffit à le faire apparaître.
+        cache.recit = "Retour."
+        cache.save()
+        self.assertEqual(self.get("2025-06-03").json()["suivant"]["date"], "2025-06-12")
+        self.assertEqual(dernier.date, date(2025, 6, 3))
+
     def test_aucune_donnee_sensible(self):
         contenu = self.get().content.decode()
 
@@ -228,6 +266,9 @@ class NombreDeRequetesTests(TestCase):
         japon = Jour.objects.get(voyage__slug="japon-2025", date=date(2025, 6, 2))
         for n in range(5, 13):
             creer_photo(japon, n)
+        # Des vidéos et des photos animées : leurs MP4 ne coûtent aucune requête.
+        for n, type_ in ((13, Photo.Type.VIDEO), (14, Photo.Type.ANIMEE), (15, Photo.Type.VIDEO)):
+            creer_photo(japon, n, type=type_)
         grands = {url: self.compter(url) for url in self.ATTENDU}
 
         self.assertEqual(petits, self.ATTENDU)

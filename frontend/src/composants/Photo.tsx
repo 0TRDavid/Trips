@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { PhotoResume } from "../api/types";
 import { placeholderDataUrl } from "../lib/placeholder";
 import { ratio, srcParDefaut, srcset } from "../lib/rendus";
@@ -26,6 +26,11 @@ type Props = {
   /** Identifiant partagé avec l'élément d'une autre page (étape 6). */
   transitionId?: string;
   className?: string;
+  /**
+   * Couche posée exactement sur l'image, dans la même boîte (vidéo d'une
+   * photo animée, lecteur d'une vidéo). L'image reste dessous comme aperçu.
+   */
+  children?: ReactNode;
 };
 
 /**
@@ -46,6 +51,7 @@ export default function Photo({
   alt,
   transitionId,
   className,
+  children,
 }: Props) {
   const src = srcParDefaut(photo);
   // On mémorise QUELLE image est chargée (et non un simple booléen) : si la
@@ -88,6 +94,7 @@ export default function Photo({
           onLoad={() => setChargee(src)}
         />
       )}
+      {children}
     </div>
   );
 

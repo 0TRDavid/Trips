@@ -39,6 +39,8 @@ export function useGlissement(surGlissement: (d: Direction) => void) {
   return {
     onPointerDown: (e: ReactPointerEvent) => {
       if (e.pointerType === "mouse") return;
+      // Contrôles d'une vidéo (barre de progression…) : le geste leur appartient.
+      if ((e.target as Element).closest?.("[data-sans-glissement]")) return;
       doigts.current.add(e.pointerId);
       // Deuxième doigt : c'est un pincement, on abandonne le geste.
       depart.current =

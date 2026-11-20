@@ -17,7 +17,7 @@ class CommandeTests(CacheTemporaire, TestCase):
         get_user_model().objects.create_superuser("dd", password="x")
         self.client_nc = FauxClient(
             {"a.HEIC": ("1", photo_tokyo("09:00:00")), "b.jpg": ("2", photo_tokyo("10:00:00"))},
-            autres=["a.MOV"],
+            autres=["a.png"],
         )
 
     def lancer(self, *args):
@@ -29,9 +29,9 @@ class CommandeTests(CacheTemporaire, TestCase):
     def test_import_affiche_le_rapport(self):
         sortie = self.lancer("/Shared/Japon 2025/", "--fuseau", "Asia/Tokyo")
 
-        self.assertIn("Images dans Nextcloud : 2", sortie)
-        self.assertIn("Photos en base        : 2", sortie)
-        self.assertIn(".mov : 1", sortie)
+        self.assertIn("Médias dans Nextcloud : 2", sortie)
+        self.assertIn("Médias en base        : 2", sortie)
+        self.assertIn(".png : 1", sortie)
         self.assertIn("concordent", sortie)
         self.assertEqual(Voyage.objects.get().auteur.username, "dd")
 

@@ -150,7 +150,7 @@ priorité n°1.
 ## Stack
 - Backend : Django + Django REST Framework, PostgreSQL
 - Frontend : React + TypeScript (Vite), Motion, GSAP
-- Photos : Nextcloud via WebDAV, lecture seule, originaux jamais copiés ; un dossier par voyage, un sous-dossier par photographe (`Japon 2025/Hugo/…`, `Japon 2025/David/…` → `Photo.photographe`), HEIC, JPEG et CR2
+- Photos : Nextcloud via WebDAV, lecture seule, originaux jamais copiés ; un dossier par voyage, un sous-dossier par photographe (`Japon 2025/Hugo/…`, `Japon 2025/David/…` → `Photo.photographe`), HEIC, JPEG et CR2 ; vidéos .mp4/.mov ; photos animées Samsung (HEIC + boîte `mpvd`)
 - Déploiement : Docker Compose, derrière Nginx Proxy Manager
 
 ## Règles
@@ -165,12 +165,14 @@ priorité n°1.
 - N'accède à aucune machine du réseau en dehors de Nextcloud.
 - Animations : respecte `prefers-reduced-motion`.
 - Rendus : WebP générés par `voyages/rendus.py`, jamais d'EXIF/XMP/ICC passés à `save()` ; le cache est régénérable, seule la base est irremplaçable.
+- Médias : la classe `Photo` porte un `type` (`photo`, `animee`, `video`) ; on ne la renomme pas. Vidéos lues par ffmpeg/ffprobe en flux sur WebDAV (`client.entree_video`), vidéo d'une photo animée par `memfd` (`video.entree_memoire`) : jamais de fichier temporaire. Rendus MP4 par `voyages/rendus_video.py` uniquement (`-map` explicites, `-map_metadata -1`, `-dn`, HDR converti en SDR) ; poster d'une vidéo = `produire_rendus()` sur une image extraite.
+- Nouvelle analyse à l'import (ex. un nouveau format à détecter) : incrémenter `VERSION_ANALYSE` dans `importation.py` ; les photos concernées sont relues une fois.
 - Après un changement de `vite.config.ts` : `docker compose restart frontend`.
 - Après la création d'un nouveau module Python jamais importé (ex. `admin.py`) : `docker compose restart backend` (runserver ne le surveille pas encore).
 - Markdown : un seul moteur, `voyages/markdown.py: rendre_markdown()` (API, aperçu admin, futur export). Le HTML écrit dans un récit n'est jamais interprété.
 - API en lecture seule, sans N+1 : chaque endpoint a un nombre de requêtes fixe, vérifié par `NombreDeRequetesTests` (à mettre à jour si on ajoute une requête). Jamais de chemin Nextcloud, d'etag ni de coordonnées par photo dans l'API.
 - Voyages, jours et photos naissent de l'import : l'admin ne les crée ni ne les supprime.
-- Front : toute photo passe par `composants/Photo.tsx` (srcset, ratio réservé, couleur + ThumbHash). URL construites par `lib/chemins.ts`. Éléments partagés entre pages marqués `data-transition-id` via `lib/transitions.ts`.
+- Front : toute photo passe par `composants/Photo.tsx` (srcset, ratio réservé, couleur + ThumbHash) ; une photo animée par `PhotoAnimee.tsx`, une vidéo dans la visionneuse par `LecteurVideo.tsx`, qui posent leur `<video>` dans `Photo` (prop `children`). Photo animée jouée une seule fois à son apparition, puis image fixe ; lecture automatique seulement sans `prefers-reduced-motion` (`hooks/useMouvementReduit.ts`). URL construites par `lib/chemins.ts`. Éléments partagés entre pages marqués `data-transition-id` via `lib/transitions.ts`.
 - Carte : MapLibre + OpenFreeMap, chargée en lazy ; ne pas retirer `setWorkerUrl` dans `CarteParcours.tsx`.
 
 ## Commandes
@@ -181,17 +183,19 @@ priorité n°1.
 - `docker compose exec frontend npm run build` : vérification TypeScript + build (puis `docker compose exec frontend rm -rf dist`, le dossier appartient à root)
 - `docker compose exec frontend npm test` : tests Vitest du front (logique pure : srcset, dates, carte, glissement)
 - `docker compose exec backend python manage.py createsuperuser` : compte admin (`/admin/`)
-- `docker compose exec backend python manage.py import_voyage "<dossier>" --fuseau Asia/Tokyo [--horloge "Canon EOS 100D=UTC"] [--titre ...] [--ancien-dossier "<ancien chemin>"] [--limite N] [--dry-run]` : importe ou réimporte un dossier Nextcloud (chemin depuis la racine de l'utilisateur, ex. `/Shared/Japon 2025`). Relançable sans doublons ; `--fuseau` seulement au premier import ; le rapport final compare Nextcloud et la base.
+- `docker compose exec backend python manage.py import_voyage "<dossier>" --fuseau Asia/Tokyo [--horloge "Canon EOS 100D=UTC"] [--horloge "nom de fichier=Europe/Paris"] [--titre ...] [--ancien-dossier "<ancien chemin>"] [--limite N] [--dry-run]` : importe ou réimporte un dossier Nextcloud (chemin depuis la racine de l'utilisateur, ex. `/Shared/Japon 2025`). Relançable sans doublons ; `--fuseau` seulement au premier import ; le rapport final compare Nextcloud et la base.
   Une photo déplacée entre sous-dossiers (même etag + même nom) garde son identité. Dossier du voyage renommé dans Nextcloud : l'import refuse (photos déjà connues) et indique la commande avec `--ancien-dossier`. Faire d'abord un `--dry-run`.
-  Génère ensuite les rendus web du voyage (sauf `--sans-rendus`).
-- `docker compose exec backend python manage.py generer_rendus [--voyage <slug>] [--photos 1,2,3] [--force] [--processus N] [--dry-run]` : rendus WebP (400 / 1280 / 2560 px, sans métadonnées) dans le volume `rendus` (`/cache/rendus/<photo_id>/<etag>-<taille>.webp`). Ne régénère que les photos dont l'etag a changé ou dont un fichier manque. Japon : 98 photos en ~45 s, ~70 Mo.
-- `docker compose exec backend sh -c 'exiftool -q -a -s -gps:all /cache/rendus/*/*.webp'` : contrôle qu'aucun rendu ne contient de GPS (ne doit rien afficher)
+  `--horloge "nom de fichier=…"` : une vidéo nommée `AA-MM-JJ HH-MM-SS…` est datée par son nom (exports de Hugo, dont la date interne est fausse). Japon : posé, Europe/Paris.
+  Médias sans date (WhatsApp de Valérie) : importés masqués, à la date du fichier ; un jour qui n'a que des médias masqués n'apparaît pas sur le site.
+  Génère ensuite les rendus web du voyage (sauf `--sans-rendus`) ; pour un gros encodage, préférer `--sans-rendus` puis `generer_rendus --processus 2` (mémoire de la VM).
+- `docker compose exec backend python manage.py generer_rendus [--voyage <slug>] [--photos 1,2,3] [--force] [--processus N] [--dry-run]` : rendus WebP (400 / 1280 / 2560 px, sans métadonnées) et MP4 H.264 (petit côté 720 et 1080, jamais agrandi, 30 i/s max, sans son pour une photo animée) dans le volume `rendus` (`/cache/rendus/<photo_id>/<etag>-<taille>.webp|mp4`). Deux pistes indépendantes (`rendus_etag`, `videos_etag`) : ne régénère que ce dont l'etag a changé ou dont un fichier manque. Japon (660 médias) : premier passage ~25 min avec `--processus 2`, cache 2,4 Go (dont MP4 des photos animées 1,1 Go, des vidéos 0,76 Go).
+- `docker compose exec backend sh -c 'exiftool -q -a -s -gps:all -userdata:all -keys:all /cache/rendus/*/*.webp /cache/rendus/*/*.mp4'` : contrôle qu'aucun rendu ne contient de GPS (ne doit rien afficher)
 - API (lecture seule, `API_ACCES` dans `.env` : `prive-reseau` ou `connecte`) :
   - `GET /api/voyages/` : voyages, dates, `nb_jours`, `nb_photos`, couverture (choisie, sinon premier favori, sinon première photo)
   - `GET /api/voyages/<slug>/` : + récit d'intro (`recit_intro` et `recit_intro_html`), jours résumés, `trace` GPS allégé `[{lat, lon, jour}]`
-  - `GET /api/voyages/<slug>/jours/<AAAA-MM-JJ>/` : récit (Markdown + HTML), photos visibles dans l'ordre (`prise_le` avec le décalage du voyage), `precedent` / `suivant`
+  - `GET /api/voyages/<slug>/jours/<AAAA-MM-JJ>/` : récit (Markdown + HTML), médias visibles dans l'ordre (`prise_le` avec le décalage du voyage ; `type`, `duree`, `videos` {"720", "1080"} ; `rendus` = image ou poster), `precedent` / `suivant`
   - `GET /api/voyages/<slug>/photos/` : toutes les photos visibles du voyage
-- Admin `/admin/` : Voyage (couverture en grille, jours restant à écrire), Jour (éditeur Markdown EasyMDE avec aperçu serveur, photos réordonnables par glisser-déposer sur la bande grise), Photo ; action « Régénérer les rendus » (lancée en arrière-plan, suivi dans `docker compose logs -f backend`).
+- Admin `/admin/` : Voyage (couverture en grille, jours restant à écrire), Jour (éditeur Markdown EasyMDE avec aperçu serveur, photos réordonnables par glisser-déposer sur la bande grise), Média (filtre par type, lecteur vidéo dans la fiche) ; action « Régénérer les rendus » (lancée en arrière-plan, suivi dans `docker compose logs -f backend`).
 - Ajout d'une dépendance front : `docker compose exec frontend npm install <paquet>` puis `docker compose up -d --build frontend`
 - URL de dev : http://192.168.30.252:5173 (le proxy Vite relaie `/api` vers le backend)
 - Routes du front : `/`, `/voyages/<slug>`, `/voyages/<slug>/jours/<date>`, `/voyages/<slug>/jours/<date>/photos/<id>` (visionneuse = route enfant du jour), 404 sinon
