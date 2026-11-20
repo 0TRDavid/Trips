@@ -27,6 +27,8 @@ export type PhotoJour = PhotoResume & {
   prise_le: string | null;
   legende: string;
   favori: boolean;
+  /** Prénom tiré du sous-dossier Nextcloud ("Hugo"), vide si inconnu. */
+  photographe: string;
 };
 
 export type VoyageResume = {

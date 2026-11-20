@@ -137,8 +137,9 @@ class DetailJourTests(TestCase):
         photo = d["photos"][0]
         self.assertEqual(
             set(photo),
-            {"id", "largeur", "hauteur", "couleur", "placeholder", "rendus", "prise_le", "legende", "favori"},
+            {"id", "largeur", "hauteur", "couleur", "placeholder", "rendus", "prise_le", "legende", "favori", "photographe"},
         )
+        self.assertEqual(photo["photographe"], "")
         self.assertEqual((photo["largeur"], photo["hauteur"], photo["couleur"]), (3000, 2000, "#336699"))
         self.assertEqual(photo["rendus"]["moyenne"]["url"], f"/media/rendus/{photo['id']}/abc-moyenne.webp")
 

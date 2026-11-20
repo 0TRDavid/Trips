@@ -67,6 +67,9 @@ class Photo(models.Model):
     longitude = models.FloatField("longitude", null=True, blank=True)
     altitude = models.FloatField("altitude", null=True, blank=True)
     appareil = models.CharField("appareil", max_length=200, blank=True)
+    # Sous-dossier du voyage dans Nextcloud (« Japon/Hugo/IMG_1.CR2 » → « Hugo ») ;
+    # vide pour une photo à la racine du dossier du voyage.
+    photographe = models.CharField("photographe", max_length=100, blank=True)
     orientation = models.PositiveSmallIntegerField("orientation", null=True, blank=True)
     legende = models.TextField("légende", blank=True)
     # Position dans le jour (1, 2, 3…), réglée par glisser-déposer dans l'admin.

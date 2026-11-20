@@ -26,6 +26,11 @@ class Command(BaseCommand):
             help="Horloge d'un appareil sans décalage EXIF, mémorisée sur le voyage "
                  "(ex. \"Canon EOS 100D=UTC\"). Répétable.",
         )
+        parser.add_argument(
+            "--ancien-dossier", metavar="DOSSIER",
+            help="Le dossier du voyage a été renommé ou déplacé dans Nextcloud : son ancien chemin. "
+                 "Le voyage, ses récits et ses photos sont conservés.",
+        )
         parser.add_argument("--limite", type=int, help="N'importe que les N premières photos (test)")
         parser.add_argument("--dry-run", action="store_true", help="Affiche ce qui serait fait, sans rien écrire ni télécharger")
         parser.add_argument("--sans-rendus", action="store_true", help="Ne génère pas les rendus web (voir generer_rendus)")
@@ -41,6 +46,7 @@ class Command(BaseCommand):
                 horloges=self._horloges(options["horloge"]),
                 limite=options["limite"],
                 dry_run=options["dry_run"],
+                ancien_dossier=options["ancien_dossier"],
                 progression=self._progression,
             )
         except (ImportErreur, NextcloudErreur) as exc:
@@ -94,11 +100,16 @@ class Command(BaseCommand):
         w(self.style.MIGRATE_HEADING("Simulation (--dry-run) : rien n'a été écrit" if r.dry_run else "Import terminé"))
         if r.voyage:
             w(f"Voyage : {r.voyage.titre} ({r.voyage.date_debut} → {r.voyage.date_fin}, {r.voyage.fuseau_horaire})")
+            if r.renomme_depuis:
+                verbe = "serait déplacé" if r.dry_run else "déplacé"
+                w(f"  dossier {verbe} : « {r.renomme_depuis} » → « {r.dossier} »")
             for appareil, fuseau in r.voyage.horloges_appareils.items():
                 w(f"  horloge {appareil} : {fuseau}")
         w(f"Images dans Nextcloud : {r.images_nextcloud}")
         w(f"Photos en base        : {r.photos_en_base}")
         w(f"  créées {r.creees} · mises à jour {r.mises_a_jour} · inchangées {r.inchangees}")
+        if r.deplacees:
+            w(f"  dont déplacées dans Nextcloud (reconnues, non réimportées) : {r.deplacees}")
         if r.ignores:
             detail = ", ".join(f"{ext} : {n}" for ext, n in sorted(r.ignores.items()))
             w(f"Fichiers ignorés      : {sum(r.ignores.values())} ({detail})")

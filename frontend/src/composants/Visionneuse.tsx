@@ -131,6 +131,7 @@ export default function Visionneuse({ photos, index, date, precedent, suivant, f
             <p className={styles.quand}>
               {dateCourte(date)}
               {photo.prise_le && ` · ${heureLocale(photo.prise_le)}`}
+              {photo.photographe && ` · ${photo.photographe}`}
               {photo.favori && " · ★"}
             </p>
           </>

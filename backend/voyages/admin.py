@@ -368,20 +368,20 @@ class JourAdmin(SortableAdminBase, admin.ModelAdmin):
 
 @admin.register(Photo)
 class PhotoAdmin(admin.ModelAdmin):
-    list_display = ["apercu", "nom", "jour", "prise_le", "favori", "visible", "rendus_a_jour"]
+    list_display = ["apercu", "nom", "jour", "prise_le", "photographe", "favori", "visible", "rendus_a_jour"]
     list_display_links = ["apercu", "nom"]
     list_editable = ["favori", "visible"]
-    list_filter = ["jour__voyage", "visible", "favori", "appareil"]
+    list_filter = ["jour__voyage", "photographe", "visible", "favori", "appareil"]
     list_select_related = ["jour__voyage"]
     search_fields = ["legende", "chemin_nextcloud"]
     date_hierarchy = "prise_le"
     list_per_page = 50
     fields = [
-        "apercu_grand", "legende", ("favori", "visible"), "jour", "prise_le", "appareil",
+        "apercu_grand", "legende", ("favori", "visible"), "jour", "prise_le", "photographe", "appareil",
         ("largeur", "hauteur", "couleur"), "chemin_nextcloud",
     ]
     readonly_fields = [
-        "apercu_grand", "jour", "prise_le", "appareil", "largeur", "hauteur", "couleur", "chemin_nextcloud",
+        "apercu_grand", "jour", "prise_le", "photographe", "appareil", "largeur", "hauteur", "couleur", "chemin_nextcloud",
     ]
     actions = [regenerer_photos]
 

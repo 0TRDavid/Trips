@@ -150,7 +150,7 @@ priorité n°1.
 ## Stack
 - Backend : Django + Django REST Framework, PostgreSQL
 - Frontend : React + TypeScript (Vite), Motion, GSAP
-- Photos : Nextcloud via WebDAV, lecture seule, originaux jamais copiés ; un dossier par voyage, HEIC et JPEG
+- Photos : Nextcloud via WebDAV, lecture seule, originaux jamais copiés ; un dossier par voyage, un sous-dossier par photographe (`Japon 2025/Hugo/…`, `Japon 2025/David/…` → `Photo.photographe`), HEIC, JPEG et CR2
 - Déploiement : Docker Compose, derrière Nginx Proxy Manager
 
 ## Règles
@@ -181,7 +181,8 @@ priorité n°1.
 - `docker compose exec frontend npm run build` : vérification TypeScript + build (puis `docker compose exec frontend rm -rf dist`, le dossier appartient à root)
 - `docker compose exec frontend npm test` : tests Vitest du front (logique pure : srcset, dates, carte, glissement)
 - `docker compose exec backend python manage.py createsuperuser` : compte admin (`/admin/`)
-- `docker compose exec backend python manage.py import_voyage "<dossier>" --fuseau Asia/Tokyo [--horloge "Canon EOS 100D=UTC"] [--titre ...] [--limite N] [--dry-run]` : importe ou réimporte un dossier Nextcloud (chemin depuis la racine de l'utilisateur, ex. `/Shared/Japon …`). Relançable sans doublons ; `--fuseau` seulement au premier import ; le rapport final compare Nextcloud et la base.
+- `docker compose exec backend python manage.py import_voyage "<dossier>" --fuseau Asia/Tokyo [--horloge "Canon EOS 100D=UTC"] [--titre ...] [--ancien-dossier "<ancien chemin>"] [--limite N] [--dry-run]` : importe ou réimporte un dossier Nextcloud (chemin depuis la racine de l'utilisateur, ex. `/Shared/Japon 2025`). Relançable sans doublons ; `--fuseau` seulement au premier import ; le rapport final compare Nextcloud et la base.
+  Une photo déplacée entre sous-dossiers (même etag + même nom) garde son identité. Dossier du voyage renommé dans Nextcloud : l'import refuse (photos déjà connues) et indique la commande avec `--ancien-dossier`. Faire d'abord un `--dry-run`.
   Génère ensuite les rendus web du voyage (sauf `--sans-rendus`).
 - `docker compose exec backend python manage.py generer_rendus [--voyage <slug>] [--photos 1,2,3] [--force] [--processus N] [--dry-run]` : rendus WebP (400 / 1280 / 2560 px, sans métadonnées) dans le volume `rendus` (`/cache/rendus/<photo_id>/<etag>-<taille>.webp`). Ne régénère que les photos dont l'etag a changé ou dont un fichier manque. Japon : 98 photos en ~45 s, ~70 Mo.
 - `docker compose exec backend sh -c 'exiftool -q -a -s -gps:all /cache/rendus/*/*.webp'` : contrôle qu'aucun rendu ne contient de GPS (ne doit rien afficher)
