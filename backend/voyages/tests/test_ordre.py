@@ -40,7 +40,7 @@ class ImportOrdreTests(TestCase):
     def importer(self, client):
         return importer_voyage(client, DOSSIER, fuseau="Asia/Tokyo", auteur=self.auteur)
 
-    def test_nouvelles_photos_a_la_suite_sans_toucher_l_ordre_choisi(self):
+    def test_nouvelles_photos_intercalees_sans_toucher_l_ordre_choisi(self):
         fichiers = {
             "a.jpg": ("1", photo_tokyo("09:00:00")),
             "b.jpg": ("2", photo_tokyo("10:00:00")),
@@ -58,9 +58,10 @@ class ImportOrdreTests(TestCase):
         self.importer(FauxClient(fichiers))
 
         ordres = dict(Photo.objects.values_list("chemin_nextcloud", "ordre"))
-        self.assertEqual(ordres, {f"{DOSSIER}/a.jpg": 2, f"{DOSSIER}/b.jpg": 1, f"{DOSSIER}/c.jpg": 3})
+        # c (08:00) s'intercale avant toutes les autres ; b reste avant a, comme choisi.
+        self.assertEqual(ordres, {f"{DOSSIER}/a.jpg": 3, f"{DOSSIER}/b.jpg": 2, f"{DOSSIER}/c.jpg": 1})
 
-    def test_photo_qui_change_de_jour_va_a_la_fin_du_nouveau_jour(self):
+    def test_photo_qui_change_de_jour_s_intercale_a_son_heure(self):
         fichiers = {
             "a.jpg": ("1", photo_tokyo("09:00:00", jour=5)),
             "b.jpg": ("2", photo_tokyo("10:00:00", jour=6)),
@@ -72,3 +73,19 @@ class ImportOrdreTests(TestCase):
 
         a = Photo.objects.get(chemin_nextcloud=f"{DOSSIER}/a.jpg")
         self.assertEqual((str(a.jour.date), a.ordre), ("2025-04-06", 2))
+
+    def test_photos_d_un_second_photographe_intercalees_par_heure(self):
+        fichiers = {
+            "Hugo/h1.jpg": ("1", photo_tokyo("09:00:00")),
+            "Hugo/h2.jpg": ("2", photo_tokyo("12:00:00")),
+        }
+        self.importer(FauxClient(fichiers))
+        fichiers["David/d1.heic"] = ("3", photo_tokyo("10:00:00"))
+        fichiers["David/d2.heic"] = ("4", photo_tokyo("13:00:00"))
+        fichiers["David/d0.heic"] = ("5", photo_tokyo("08:00:00"))
+
+        self.importer(FauxClient(fichiers))
+
+        noms = [c.rsplit("/", 1)[1] for c in Photo.objects.order_by("ordre").values_list("chemin_nextcloud", flat=True)]
+        self.assertEqual(noms, ["d0.heic", "h1.jpg", "d1.heic", "h2.jpg", "d2.heic"])
+        self.assertEqual(sorted(Photo.objects.values_list("ordre", flat=True)), [1, 2, 3, 4, 5])

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { PhotoResume, PointTrace } from "../api/types";
 import { decisionGlissement } from "../hooks/useGlissement";
 import { cadrageJour, ligneTrace } from "./carte";
-import { dateCourte, dateLongue, estDateJour, heureLocale, numeroJour, periode } from "./dates";
+import { dateCourte, dateLongue, estDateJour, heureLocale, libelleHeure, momentsParHeure, numeroJour, periode } from "./dates";
 import { ratio, srcParDefaut, srcset } from "./rendus";
 
 const photo: PhotoResume = {
@@ -93,5 +93,42 @@ describe("glissement", () => {
     expect(decisionGlissement(-70, 200, 300)).toBeNull();
     expect(decisionGlissement(-20, 0, 30)).toBeNull();
     expect(decisionGlissement(-50, 0, 500)).toBeNull();
+  });
+});
+
+describe("moments de la journée", () => {
+  const p = (id: number, prise_le: string | null) => ({ id, prise_le });
+
+  it("regroupe les photos consécutives de la même heure, dans l'ordre reçu", () => {
+    const moments = momentsParHeure([
+      p(1, "2025-06-01T09:05:00+09:00"),
+      p(2, "2025-06-01T09:59:00+09:00"),
+      p(3, "2025-06-01T14:16:00+09:00"),
+      p(4, "2025-06-01T14:30:00+09:00"),
+    ]);
+    expect(moments.map((m) => [m.heure, m.photos.map((x) => x.id)])).toEqual([
+      [9, [1, 2]],
+      [14, [3, 4]],
+    ]);
+  });
+  it("lit l'heure locale du voyage, sans conversion", () => {
+    expect(momentsParHeure([p(1, "2025-06-01T23:30:00+09:00")])[0].heure).toBe(23);
+  });
+  it("une heure qui revient plus loin (ordre retouché) ouvre un nouveau moment", () => {
+    const heures = momentsParHeure([
+      p(1, "2025-06-01T10:00:00+09:00"),
+      p(2, "2025-06-01T11:00:00+09:00"),
+      p(3, "2025-06-01T10:30:00+09:00"),
+    ]).map((m) => m.heure);
+    expect(heures).toEqual([10, 11, 10]);
+  });
+  it("met les photos sans heure à part", () => {
+    expect(momentsParHeure([p(1, null), p(2, null)])).toEqual([{ heure: null, photos: [p(1, null), p(2, null)] }]);
+    expect(momentsParHeure([])).toEqual([]);
+  });
+  it("libellés", () => {
+    expect(libelleHeure(9)).toBe("9 h");
+    expect(libelleHeure(0)).toBe("0 h");
+    expect(libelleHeure(null)).toBe("Heure inconnue");
   });
 });

@@ -34,7 +34,9 @@ class FauxClient:
     def telecharger(self, chemin, limite=None):
         self.telechargements.append(chemin)
         self.limites.append(limite)
-        octets = self.fichiers[chemin.rsplit("/", 1)[-1]][1]
+        # Clé = chemin relatif au dossier du voyage (« Hugo/a.jpg » ou « a.jpg »).
+        nom = next(n for n in self.fichiers if chemin.endswith(f"/{n}"))
+        octets = self.fichiers[nom][1]
         return octets[:limite] if limite else octets
 
 
@@ -124,8 +126,8 @@ class ImportTests(TestCase):
         self.assertEqual(photo.etag, "e1-v2")
         self.assertEqual(photo.jour.date, date(2025, 4, 6))
         self.assertEqual((photo.legende, photo.favori, photo.visible), ("Fushimi Inari", True, False))
-        # Elle a changé de jour : son rang dans l'ancien jour n'a plus de sens, elle se
-        # range à la fin du nouveau (seule photo du 6 ici). Voir test_ordre.py.
+        # Elle a changé de jour : son rang dans l'ancien jour n'a plus de sens, elle
+        # s'intercale à son heure dans le nouveau (seule photo du 6 ici). Voir test_ordre.py.
         self.assertEqual(photo.ordre, 1)
         self.assertEqual(Photo.objects.count(), 3)
 
@@ -298,3 +300,129 @@ class Cr2EtHorlogesTests(TestCase):
     def test_horloge_invalide(self):
         with self.assertRaisesMessage(ImportErreur, "Fuseau horaire inconnu"):
             self.importer(FauxClient({}), horloges={"Canon EOS 100D": "Mars/Olympus"})
+
+
+class SousDossiersTests(TestCase):
+    """Un sous-dossier par photographe : « Japon/Hugo/… », « Japon/David/… »."""
+
+    def setUp(self):
+        self.auteur = get_user_model().objects.create_user("dd")
+
+    def importer(self, client, **kwargs):
+        kwargs.setdefault("fuseau", "Asia/Tokyo")
+        return importer_voyage(client, DOSSIER, auteur=self.auteur, **kwargs)
+
+    def test_photographe_tire_du_sous_dossier(self):
+        self.importer(FauxClient({
+            "Hugo/a.jpg": ("1", photo_tokyo("09:00:00")),
+            "David/b.heic": ("2", photo_tokyo("10:00:00")),
+            "racine.jpg": ("3", photo_tokyo("11:00:00")),
+        }))
+        self.assertEqual(
+            dict(Photo.objects.values_list("chemin_nextcloud", "photographe")),
+            {f"{DOSSIER}/Hugo/a.jpg": "Hugo", f"{DOSSIER}/David/b.heic": "David", f"{DOSSIER}/racine.jpg": ""},
+        )
+
+    def test_photo_rangee_dans_un_sous_dossier_garde_son_identite(self):
+        client = FauxClient({
+            "a.jpg": ("1", photo_tokyo("09:00:00")),
+            "b.jpg": ("2", photo_tokyo("10:00:00")),
+        })
+        self.importer(client)
+        a = Photo.objects.get(chemin_nextcloud=f"{DOSSIER}/a.jpg")
+        Photo.objects.filter(pk=a.pk).update(legende="Shibuya", favori=True, rendus_etag="1")
+
+        # Les deux fichiers sont rangés dans Hugo/ (Nextcloud conserve l'etag), une
+        # nouvelle photo arrive dans David/.
+        client.fichiers = {
+            "Hugo/a.jpg": client.fichiers["a.jpg"],
+            "Hugo/b.jpg": client.fichiers["b.jpg"],
+            "David/c.heic": ("3", photo_tokyo("09:30:00")),
+        }
+        client.telechargements.clear()
+        rapport = self.importer(client, fuseau=None)
+
+        self.assertEqual(Photo.objects.count(), 3)
+        a.refresh_from_db()
+        self.assertEqual(a.chemin_nextcloud, f"{DOSSIER}/Hugo/a.jpg")
+        self.assertEqual((a.legende, a.favori, a.rendus_etag, a.photographe), ("Shibuya", True, "1", "Hugo"))
+        self.assertEqual(client.telechargements, [f"{DOSSIER}/David/c.heic"])
+        self.assertEqual((rapport.creees, rapport.inchangees, rapport.deplacees), (1, 2, 2))
+        self.assertEqual(rapport.disparues, [])
+        self.assertEqual((rapport.images_nextcloud, rapport.photos_en_base), (3, 3))
+
+    def test_deplacement_vu_par_le_dry_run(self):
+        client = FauxClient({"a.jpg": ("1", photo_tokyo("09:00:00"))})
+        self.importer(client)
+        client.fichiers = {"Hugo/a.jpg": client.fichiers["a.jpg"]}
+
+        rapport = self.importer(client, fuseau=None, dry_run=True)
+
+        self.assertEqual((rapport.creees, rapport.inchangees, rapport.deplacees), (0, 1, 1))
+        self.assertEqual(rapport.disparues, [])
+        self.assertEqual(Photo.objects.get().chemin_nextcloud, f"{DOSSIER}/a.jpg")
+
+    def test_meme_etag_mais_autre_nom_n_est_pas_un_deplacement(self):
+        client = FauxClient({"a.jpg": ("1", photo_tokyo("09:00:00"))})
+        self.importer(client)
+        client.fichiers = {"Hugo/z.jpg": client.fichiers["a.jpg"]}
+
+        rapport = self.importer(client, fuseau=None)
+
+        self.assertEqual((rapport.creees, rapport.deplacees), (1, 0))
+        self.assertEqual(rapport.disparues, [f"{DOSSIER}/a.jpg"])
+
+    def test_changement_de_sous_dossier_corrige_le_photographe(self):
+        client = FauxClient({"Hugo/a.jpg": ("1", photo_tokyo("09:00:00"))})
+        self.importer(client)
+        client.fichiers = {"David/a.jpg": client.fichiers["Hugo/a.jpg"]}
+
+        self.importer(client, fuseau=None)
+
+        photo = Photo.objects.get()
+        self.assertEqual((photo.chemin_nextcloud, photo.photographe), (f"{DOSSIER}/David/a.jpg", "David"))
+
+
+class DossierRenommeTests(TestCase):
+    """Le dossier du voyage est renommé dans Nextcloud (« Japon 2025-2026… » → « Japon 2025 »)."""
+
+    def setUp(self):
+        self.auteur = get_user_model().objects.create_user("dd")
+        self.client_nc = FauxClient({"a.jpg": ("1", photo_tokyo("09:00:00"))})
+        importer_voyage(self.client_nc, "Shared/Ancien", fuseau="Asia/Tokyo", auteur=self.auteur)
+        self.client_nc.fichiers = {
+            "Hugo/a.jpg": self.client_nc.fichiers["a.jpg"],
+            "David/b.heic": ("2", photo_tokyo("10:00:00")),
+        }
+
+    def test_dossier_inconnu_avec_photos_deja_importees_refuse(self):
+        with self.assertRaisesMessage(ImportErreur, '--ancien-dossier "Shared/Ancien"'):
+            importer_voyage(self.client_nc, DOSSIER, fuseau="Asia/Tokyo", auteur=self.auteur)
+        self.assertEqual(Voyage.objects.count(), 1)
+
+    def test_ancien_dossier_conserve_le_voyage(self):
+        voyage = Voyage.objects.get()
+        Jour.objects.filter(voyage=voyage).update(recit="Arrivée")
+
+        rapport = importer_voyage(self.client_nc, DOSSIER, ancien_dossier="/Shared/Ancien/", auteur=self.auteur)
+
+        voyage.refresh_from_db()
+        self.assertEqual(Voyage.objects.count(), 1)
+        self.assertEqual(voyage.dossier_nextcloud, DOSSIER)
+        self.assertEqual(rapport.renomme_depuis, "Shared/Ancien")
+        self.assertEqual((rapport.creees, rapport.deplacees, rapport.disparues), (1, 1, []))
+        self.assertEqual(
+            dict(Photo.objects.values_list("chemin_nextcloud", "photographe")),
+            {f"{DOSSIER}/Hugo/a.jpg": "Hugo", f"{DOSSIER}/David/b.heic": "David"},
+        )
+        self.assertEqual(voyage.jours.get().recit, "Arrivée")
+
+    def test_ancien_dossier_en_dry_run_ne_change_rien(self):
+        rapport = importer_voyage(self.client_nc, DOSSIER, ancien_dossier="Shared/Ancien", dry_run=True)
+
+        self.assertEqual((rapport.creees, rapport.deplacees), (1, 1))
+        self.assertEqual(Voyage.objects.get().dossier_nextcloud, "Shared/Ancien")
+
+    def test_ancien_dossier_inconnu(self):
+        with self.assertRaisesMessage(ImportErreur, "Aucun voyage importé"):
+            importer_voyage(self.client_nc, DOSSIER, ancien_dossier="Shared/Nimporte", auteur=self.auteur)

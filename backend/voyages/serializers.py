@@ -42,7 +42,7 @@ class PhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Photo
         fields = [
-            "id", "jour", "prise_le", "legende", "favori",
+            "id", "jour", "prise_le", "legende", "favori", "photographe",
             "largeur", "hauteur", "couleur", "placeholder", "rendus",
         ]
 
@@ -71,7 +71,7 @@ class PhotoDuJourSerializer(VignetteSerializer):
     prise_le = serializers.SerializerMethodField()
 
     class Meta(VignetteSerializer.Meta):
-        fields = VignetteSerializer.Meta.fields + ["prise_le", "legende", "favori"]
+        fields = VignetteSerializer.Meta.fields + ["prise_le", "legende", "favori", "photographe"]
 
     def get_prise_le(self, photo):
         return photo.prise_le.astimezone(self.context["fuseau"]).isoformat()

@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { Link } from "react-router";
 import type { PhotoJour } from "../api/types";
 import { chemins } from "../lib/chemins";
-import { dateCourte, heureLocale } from "../lib/dates";
+import { dateCourte, heureLocale, libelleHeure, momentsParHeure } from "../lib/dates";
 import { ratio } from "../lib/rendus";
 import { idPhoto } from "../lib/transitions";
 import Photo from "./Photo";
@@ -16,8 +16,30 @@ type Props = { slug: string; date: string; photos: PhotoJour[] };
  * photos d'une rangée ont la même hauteur et aucune n'est rognée. Les
  * dimensions viennent de l'API : la mise en page est juste avant le
  * chargement des images.
+ *
+ * Les photos sont regroupées par heure (« 10 h », « 14 h »…) pour suivre la
+ * journée : chaque moment a son intitulé et ses propres rangées. L'ordre est
+ * celui de l'API (heure de prise, sauf retouche dans l'admin).
  */
 export default function GaleriePhotos({ slug, date, photos }: Props) {
+  return (
+    <div className={styles.moments}>
+      {momentsParHeure(photos).map((moment, i) => {
+        const idTitre = `moment-${i}`;
+        return (
+          <section key={`${i}-${moment.heure}`} className={styles.moment} aria-labelledby={idTitre}>
+            <h2 id={idTitre} className={styles.heure}>
+              {libelleHeure(moment.heure)}
+            </h2>
+            <Rangees slug={slug} date={date} photos={moment.photos} />
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function Rangees({ slug, date, photos }: Props) {
   return (
     <ul className={styles.galerie}>
       {photos.map((photo) => {

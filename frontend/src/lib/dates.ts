@@ -85,3 +85,28 @@ export function estDateJour(valeur: string): boolean {
 export function pluriel(n: number, singulier: string, plurielForme = `${singulier}s`): string {
   return `${n} ${n > 1 ? plurielForme : singulier}`;
 }
+
+/** Groupe de photos consécutives prises dans la même heure (null : heure inconnue). */
+export type MomentDuJour<T> = { heure: number | null; photos: T[] };
+
+/**
+ * Découpe les photos d'un jour en moments d'une heure, sans changer leur
+ * ordre : un nouveau moment commence dès que l'heure change. Si l'ordre a été
+ * retouché dans l'admin, une même heure peut donc revenir plus loin.
+ */
+export function momentsParHeure<T extends { prise_le: string | null }>(photos: T[]): MomentDuJour<T>[] {
+  const moments: MomentDuJour<T>[] = [];
+  for (const photo of photos) {
+    const m = photo.prise_le?.match(/T(\d{2}):/);
+    const heure = m ? Number(m[1]) : null;
+    const dernier = moments.at(-1);
+    if (dernier && dernier.heure === heure) dernier.photos.push(photo);
+    else moments.push({ heure, photos: [photo] });
+  }
+  return moments;
+}
+
+/** « 9 h », « 14 h », « Heure inconnue » */
+export function libelleHeure(heure: number | null): string {
+  return heure === null ? "Heure inconnue" : `${heure} h`;
+}
