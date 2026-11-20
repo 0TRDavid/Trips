@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from django.test import SimpleTestCase
 from PIL.TiffImagePlugin import IFDRational
 
-from voyages.exif import _appareil, extraire_metadonnees
+from voyages.exif import nom_appareil, extraire_metadonnees
 
 from .fabrique import image
 
@@ -99,12 +99,12 @@ class ExtractionTests(SimpleTestCase):
 
 class AppareilTests(SimpleTestCase):
     def test_marque_et_modele(self):
-        self.assertEqual(_appareil("Apple", "iPhone 15 Pro"), "Apple iPhone 15 Pro")
+        self.assertEqual(nom_appareil("Apple", "iPhone 15 Pro"), "Apple iPhone 15 Pro")
 
     def test_marque_deja_dans_le_modele(self):
-        self.assertEqual(_appareil("Canon", "Canon EOS R6"), "Canon EOS R6")
+        self.assertEqual(nom_appareil("Canon", "Canon EOS R6"), "Canon EOS R6")
 
     def test_valeurs_manquantes_ou_bourrees(self):
-        self.assertEqual(_appareil(None, "Pixel 8"), "Pixel 8")
-        self.assertEqual(_appareil("SONY\x00", None), "SONY")
-        self.assertEqual(_appareil(None, None), "")
+        self.assertEqual(nom_appareil(None, "Pixel 8"), "Pixel 8")
+        self.assertEqual(nom_appareil("SONY\x00", None), "SONY")
+        self.assertEqual(nom_appareil(None, None), "")

@@ -28,6 +28,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponseNotAllowed, JsonResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.http import urlencode
 
 from .markdown import rendre_markdown
@@ -300,7 +301,8 @@ class PhotoEnLigne(SortableTabularInline):
     @admin.display(description="heure locale")
     def heure(self, photo):
         local = photo.prise_le.astimezone(ZoneInfo(photo.jour.voyage.fuseau_horaire))
-        return format_html("{}<br><small>{}</small>", local.strftime("%H:%M"), photo)
+        type_ = "" if photo.type == Photo.Type.PHOTO else f" · {photo.get_type_display()}"
+        return format_html("{}<br><small>{}{}</small>", local.strftime("%H:%M"), photo, type_)
 
 
 class JourForm(forms.ModelForm):
@@ -368,20 +370,21 @@ class JourAdmin(SortableAdminBase, admin.ModelAdmin):
 
 @admin.register(Photo)
 class PhotoAdmin(admin.ModelAdmin):
-    list_display = ["apercu", "nom", "jour", "prise_le", "photographe", "favori", "visible", "rendus_a_jour"]
+    list_display = ["apercu", "nom", "type", "jour", "prise_le", "photographe", "favori", "visible", "rendus_a_jour"]
     list_display_links = ["apercu", "nom"]
     list_editable = ["favori", "visible"]
-    list_filter = ["jour__voyage", "photographe", "visible", "favori", "appareil"]
+    list_filter = ["jour__voyage", "type", "photographe", "visible", "favori", "appareil"]
     list_select_related = ["jour__voyage"]
     search_fields = ["legende", "chemin_nextcloud"]
     date_hierarchy = "prise_le"
     list_per_page = 50
     fields = [
-        "apercu_grand", "legende", ("favori", "visible"), "jour", "prise_le", "photographe", "appareil",
-        ("largeur", "hauteur", "couleur"), "chemin_nextcloud",
+        "apercu_grand", "apercu_video", "legende", ("favori", "visible"), ("type", "duree"), "jour", "prise_le",
+        "photographe", "appareil", ("largeur", "hauteur", "couleur"), "chemin_nextcloud",
     ]
     readonly_fields = [
-        "apercu_grand", "jour", "prise_le", "photographe", "appareil", "largeur", "hauteur", "couleur", "chemin_nextcloud",
+        "apercu_grand", "apercu_video", "type", "duree", "jour", "prise_le", "photographe", "appareil",
+        "largeur", "hauteur", "couleur", "chemin_nextcloud",
     ]
     actions = [regenerer_photos]
 
@@ -402,13 +405,28 @@ class PhotoAdmin(admin.ModelAdmin):
     def apercu_grand(self, photo):
         return miniature(photo, "couverture-actuelle")
 
+    @admin.display(description="vidéo")
+    def apercu_video(self, photo):
+        """Lecteur de la plus petite vidéo (photo animée : en boucle et sans son)."""
+        rendus = sorted((r for r in photo.rendus.all() if r.format == "mp4"), key=lambda r: r.largeur)
+        if not rendus:
+            return "—" if photo.type == Photo.Type.PHOTO else "rendus vidéo pas encore générés"
+        animee = photo.type == Photo.Type.ANIMEE
+        return format_html(
+            '<video src="{}" class="couverture-actuelle" controls preload="metadata" playsinline{}></video>',
+            settings.MEDIA_URL + rendus[0].fichier,
+            mark_safe(" muted loop autoplay") if animee else "",
+        )
+
     @admin.display(description="fichier", ordering="chemin_nextcloud")
     def nom(self, photo):
         return str(photo)
 
     @admin.display(description="rendus à jour", boolean=True)
     def rendus_a_jour(self, photo):
-        return bool(photo.rendus_etag) and photo.rendus_etag == photo.etag
+        images = bool(photo.rendus_etag) and photo.rendus_etag == photo.etag
+        videos = photo.type == Photo.Type.PHOTO or photo.videos_etag == photo.etag
+        return images and videos
 
     class Media:
         css = {"all": ["voyages/admin.css"]}

@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from unittest import mock
 
@@ -7,6 +8,7 @@ from django.test import TestCase
 from voyages.importation import ImportErreur, importer_voyage
 from voyages.models import Jour, Photo, Voyage
 from voyages.nextcloud import FichierDistant
+from voyages.video import entree_memoire
 
 from .fabrique import image
 
@@ -21,6 +23,7 @@ class FauxClient:
         self.autres = list(autres)
         self.telechargements = []
         self.limites = []
+        self.sondes = []
 
     def lister(self, dossier):
         modifie = datetime(2025, 6, 1, 12, 0, tzinfo=timezone.utc)
@@ -30,6 +33,14 @@ class FauxClient:
         ]
         elements += [FichierDistant(f"{dossier}/{nom}", "x", 10, modifie) for nom in self.autres]
         return sorted(elements, key=lambda f: f.chemin)
+
+    @contextmanager
+    def entree_video(self, chemin):
+        """Comme le vrai client, mais la vidéo vient de la mémoire (memfd)."""
+        self.sondes.append(chemin)
+        nom = next(n for n in self.fichiers if chemin.endswith(f"/{n}"))
+        with entree_memoire(self.fichiers[nom][1]) as entree:
+            yield entree
 
     def telecharger(self, chemin, limite=None):
         self.telechargements.append(chemin)
@@ -60,7 +71,7 @@ class ImportTests(TestCase):
                 "IMG_0002.jpg": ("e2", photo_tokyo("18:00:00", 5)),
                 "IMG_0003.HEIC": ("e3", photo_tokyo("10:00:00", 7)),
             },
-            autres=["IMG_0001.MOV", "IMG_0002.AAE"],
+            autres=["IMG_0001.png", "IMG_0002.AAE"],
         )
 
     def test_premier_import_cree_voyage_jours_photos(self):
@@ -75,7 +86,7 @@ class ImportTests(TestCase):
         self.assertEqual(list(voyage.jours.values_list("date", flat=True)), [date(2025, 4, 5), date(2025, 4, 7)])
         self.assertEqual(Photo.objects.count(), 3)
         self.assertEqual((rapport.images_nextcloud, rapport.photos_en_base, rapport.creees), (3, 3, 3))
-        self.assertEqual(dict(rapport.ignores), {".mov": 1, ".aae": 1})
+        self.assertEqual(dict(rapport.ignores), {".png": 1, ".aae": 1})
 
         photo = Photo.objects.get(chemin_nextcloud=f"{DOSSIER}/IMG_0001.HEIC")
         self.assertEqual(photo.prise_le, datetime(2025, 4, 5, 0, 0, tzinfo=timezone.utc))

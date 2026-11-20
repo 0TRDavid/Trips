@@ -8,7 +8,7 @@ photos et rendus chargés en une fois.
 
 from datetime import date
 
-from django.db.models import Count, IntegerField, OuterRef, Subquery
+from django.db.models import Count, Exists, IntegerField, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 from django.http import Http404
 from django.shortcuts import get_object_or_404
@@ -50,9 +50,18 @@ def _photo_representative_du_jour():
     )
 
 
+def _jours_affiches(jours):
+    """Jours qui ont quelque chose à montrer : un média visible, ou un récit ou
+    un titre écrits. Un jour qui ne contient que des médias masqués (photos
+    WhatsApp sans date, rangées à la date du fichier) n'apparaît pas sur le site."""
+    return jours.annotate(
+        a_un_media_visible=Exists(Photo.objects.filter(jour=OuterRef("pk"), visible=True)),
+    ).filter(Q(a_un_media_visible=True) | ~Q(recit="") | ~Q(titre=""))
+
+
 def _voyages_annotes():
     return Voyage.objects.annotate(
-        nb_jours=_compte(Jour.objects.filter(voyage=OuterRef("pk")), "voyage"),
+        nb_jours=_compte(_jours_affiches(Jour.objects.filter(voyage=OuterRef("pk"))), "voyage"),
         nb_photos=_compte(Photo.objects.filter(jour__voyage=OuterRef("pk"), visible=True), "jour__voyage"),
         # Couverture choisie dans l'admin, sinon premier favori, sinon première photo.
         couverture_effective_id=Coalesce(
@@ -67,7 +76,7 @@ def _voyages_annotes():
 
 
 def _jours_annotes(voyage):
-    return Jour.objects.filter(voyage=voyage).annotate(
+    return _jours_affiches(Jour.objects.filter(voyage=voyage)).annotate(
         nb_photos=_compte(Photo.objects.filter(jour=OuterRef("pk"), visible=True), "jour"),
         photo_id=_photo_representative_du_jour(),
     )
@@ -127,7 +136,9 @@ class JourView(APIView):
         jours = list(
             _jours_annotes(jour.voyage_id).order_by("date").only("id", "date", "titre", "voyage_id")
         )
-        rang = next(i for i, j in enumerate(jours) if j.id == jour.id)
+        rang = next((i for i, j in enumerate(jours) if j.id == jour.id), None)
+        if rang is None:
+            raise Http404("Jour sans rien à montrer")
         precedent = jours[rang - 1] if rang > 0 else None
         suivant = jours[rang + 1] if rang + 1 < len(jours) else None
 

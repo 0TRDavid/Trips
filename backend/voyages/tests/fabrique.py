@@ -175,3 +175,82 @@ class CacheTemporaire:
         from pathlib import Path
 
         self.cache = Path(dossier.name)
+
+
+# --- Vidéos et photos animées --------------------------------------------------
+
+import shutil
+import subprocess
+from pathlib import Path
+
+FFMPEG = shutil.which("ffmpeg")
+
+
+def video(
+    *,
+    duree=1.0,
+    taille=(320, 240),
+    ips=30,
+    son=True,
+    rotation=None,
+    location="+35.6586+139.7454/",
+    creation_time="2025-04-05T05:30:00.000000Z",
+    format="mp4",
+    moov_a_la_fin=True,
+    hdr=False,
+) -> bytes:
+    """Petite vidéo synthétique (mire ffmpeg), avec position GPS et date.
+
+    Écrite dans un dossier temporaire le temps de la produire (rien à voir avec
+    un original Nextcloud), puis renvoyée en octets.
+    """
+    largeur, hauteur = taille
+    with tempfile.TemporaryDirectory() as dossier:
+        sortie = Path(dossier) / f"v.{format}"
+        cmd = ["ffmpeg", "-v", "error", "-y",
+               "-f", "lavfi", "-i", f"testsrc2=size={largeur}x{hauteur}:rate={ips}:duration={duree}"]
+        if son:
+            cmd += ["-f", "lavfi", "-i", f"sine=frequency=440:duration={duree}"]
+        cmd += ["-map", "0:v"] + (["-map", "1:a", "-c:a", "aac"] if son else [])
+        if hdr:
+            # HDR10 comme un Samsung : HEVC 10 bits, transfert PQ, couleurs BT.2020.
+            cmd += ["-c:v", "libx265", "-pix_fmt", "yuv420p10le",
+                    "-x265-params", "log-level=error:colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc"
+                    ":hdr10=1:master-display=G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1)"
+                    ":max-cll=1000,200"]
+        else:
+            cmd += ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p"]
+        if location:
+            cmd += ["-metadata", f"location={location}", "-metadata", f"location-eng={location}"]
+        if creation_time:
+            cmd += ["-metadata", f"creation_time={creation_time}"]
+        if not moov_a_la_fin:
+            cmd += ["-movflags", "+faststart"]
+        subprocess.run([*cmd, str(sortie)], check=True, capture_output=True)
+        if rotation is not None:
+            # Rotation « d'affichage » (comme un téléphone tenu verticalement), sans réencoder.
+            tournee = Path(dossier) / f"r.{format}"
+            subprocess.run(
+                ["ffmpeg", "-v", "error", "-y", "-display_rotation", str(rotation), "-i", str(sortie),
+                 "-c", "copy", "-map_metadata", "0", str(tournee)],
+                check=True, capture_output=True,
+            )
+            sortie = tournee
+        return sortie.read_bytes()
+
+
+def boite(nom: bytes, contenu: bytes, taille_64_bits=False) -> bytes:
+    if taille_64_bits:
+        return struct.pack(">I4sQ", 1, nom, 16 + len(contenu)) + contenu
+    return struct.pack(">I4s", 8 + len(contenu), nom) + contenu
+
+
+def photo_animee(video_embarquee: bytes | None = None, **kwargs_image) -> bytes:
+    """HEIC suivi d'une boîte `mpvd` contenant une vidéo, comme un Samsung S24
+    (puis une boîte `sefd`, que Samsung place après)."""
+    if video_embarquee is None:
+        video_embarquee = video(duree=0.5, taille=(160, 120), location=None)
+    kwargs_image.setdefault("lat", 35.0)
+    kwargs_image.setdefault("lon", 139.0)
+    heic = image("HEIF", **kwargs_image)
+    return heic + boite(b"mpvd", video_embarquee) + boite(b"sefd", b"\0" * 32)

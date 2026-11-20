@@ -21,11 +21,11 @@ def _taille_lisible(octets: int) -> str:
 def afficher_rapport_rendus(commande: BaseCommand, r) -> None:
     w, style = commande.stdout.write, commande.style
     if r.dry_run:
-        w(f"Rendus web à générer : {r.generees} (sur {r.photos} photos)")
+        w(f"Rendus web à générer : {r.generees} (sur {r.photos} médias)")
         return
-    w(f"Photos : {r.photos} · rendus générés {r.generees} · déjà à jour {r.inchangees}")
+    w(f"Médias : {r.photos} · rendus générés {r.generees} · déjà à jour {r.inchangees}")
     if r.generees:
-        w(f"Durée : {r.duree:.1f} s ({r.duree / r.generees:.2f} s par photo)")
+        w(f"Durée : {r.duree:.1f} s ({r.duree / r.generees:.2f} s par média)")
     w(f"Cache : {r.fichiers_cache} fichiers, {_taille_lisible(r.octets_cache)}")
     if r.erreurs:
         w(style.WARNING(f"Erreurs ({len(r.erreurs)}, retentées à la prochaine relance) :"))
@@ -36,7 +36,7 @@ def afficher_rapport_rendus(commande: BaseCommand, r) -> None:
 
 
 class Command(BaseCommand):
-    help = "Génère les rendus web (WebP sans métadonnées) des photos dont l'original a changé."
+    help = "Génère les rendus web (WebP et MP4 sans métadonnées) des médias dont l'original a changé."
 
     def add_arguments(self, parser):
         parser.add_argument("--voyage", help="Slug du voyage (par défaut : tous)")

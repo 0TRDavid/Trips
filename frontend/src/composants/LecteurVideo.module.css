@@ -1,0 +1,60 @@
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+/* Tout l'aperçu est cliquable ; le bouton rond est au centre. */
+.lire {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.5rem;
+  border: 0;
+  padding: 0;
+  background: linear-gradient(rgb(0 0 0 / 0), rgb(0 0 0 / 0.25));
+  color: #fff;
+  cursor: pointer;
+}
+
+.lire:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.icone {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  padding-left: 0.3rem; /* centre optiquement le triangle */
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(6px);
+  font-size: 1.9rem;
+  line-height: 1;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.lire:hover:not(:disabled) .icone,
+.lire:focus-visible .icone {
+  transform: scale(1.06);
+  background: rgb(0 0 0 / 0.6);
+}
+
+.duree {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icone {
+    transition: none;
+  }
+}

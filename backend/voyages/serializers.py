@@ -18,23 +18,42 @@ from rest_framework import serializers
 
 from .markdown import rendre_markdown
 from .models import Jour, Photo, Voyage
+from .rendus import TAILLES
+from .rendus_video import TAILLES_VIDEO
+
+
+def _fichier(rendu) -> dict:
+    # URL relative : elle passe par le même hôte que la page (proxy Vite, puis NPM).
+    return {"url": settings.MEDIA_URL + rendu.fichier, "largeur": rendu.largeur, "hauteur": rendu.hauteur}
 
 
 def _rendus(photo: Photo) -> dict:
-    # {"miniature": {"url": "/media/rendus/…", "largeur": 400, "hauteur": 267}, …}
-    # URL relative : elle passe par le même hôte que la page (proxy Vite, puis NPM).
+    """Images WebP (la photo, ou l'aperçu d'une vidéo) :
+    {"miniature": {"url": "/media/rendus/…", "largeur": 400, "hauteur": 267}, …}"""
+    return {r.taille: _fichier(r) for r in photo.rendus.all() if r.taille in TAILLES}
+
+
+def _videos(photo: Photo) -> dict:
+    """Vidéos MP4 par petit côté visé : {"720": {...}, "1080": {...}} ; vide pour
+    une photo. Filtré en Python sur les rendus déjà chargés : aucune requête."""
     return {
-        rendu.taille: {
-            "url": settings.MEDIA_URL + rendu.fichier,
-            "largeur": rendu.largeur,
-            "hauteur": rendu.hauteur,
-        }
-        for rendu in photo.rendus.all()
+        str(TAILLES_VIDEO[r.taille]): _fichier(r)
+        for r in photo.rendus.all() if r.taille in TAILLES_VIDEO
     }
 
 
-class PhotoSerializer(serializers.ModelSerializer):
-    """Photos d'un voyage entier (GET /api/voyages/<slug>/photos/, étape 3)."""
+class _MediaMixin(serializers.Serializer):
+    """Ce qu'il faut pour lire un média : son type, sa durée, ses vidéos.
+    L'aperçu (poster) d'une vidéo est dans `rendus`, comme une photo."""
+
+    videos = serializers.SerializerMethodField()
+
+    def get_videos(self, photo):
+        return _videos(photo)
+
+
+class PhotoSerializer(_MediaMixin, serializers.ModelSerializer):
+    """Médias d'un voyage entier (GET /api/voyages/<slug>/photos/)."""
 
     jour = serializers.DateField(source="jour.date")
     rendus = serializers.SerializerMethodField()
@@ -42,8 +61,8 @@ class PhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Photo
         fields = [
-            "id", "jour", "prise_le", "legende", "favori", "photographe",
-            "largeur", "hauteur", "couleur", "placeholder", "rendus",
+            "id", "type", "duree", "jour", "prise_le", "legende", "favori", "photographe",
+            "largeur", "hauteur", "couleur", "placeholder", "rendus", "videos",
         ]
 
     def get_rendus(self, photo):
@@ -63,7 +82,7 @@ class VignetteSerializer(serializers.ModelSerializer):
         return _rendus(photo)
 
 
-class PhotoDuJourSerializer(VignetteSerializer):
+class PhotoDuJourSerializer(_MediaMixin, VignetteSerializer):
     """Photo dans la page d'un jour : `prise_le` porte le décalage du voyage
     (« 2025-06-01T14:03:00+09:00 ») : même instant que l'UTC stocké, mais
     directement affichable en heure locale."""
@@ -71,7 +90,9 @@ class PhotoDuJourSerializer(VignetteSerializer):
     prise_le = serializers.SerializerMethodField()
 
     class Meta(VignetteSerializer.Meta):
-        fields = VignetteSerializer.Meta.fields + ["prise_le", "legende", "favori", "photographe"]
+        fields = VignetteSerializer.Meta.fields + [
+            "type", "duree", "videos", "prise_le", "legende", "favori", "photographe",
+        ]
 
     def get_prise_le(self, photo):
         return photo.prise_le.astimezone(self.context["fuseau"]).isoformat()

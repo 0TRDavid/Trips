@@ -5,7 +5,9 @@ import { chemins } from "../lib/chemins";
 import { dateCourte, heureLocale, libelleHeure, momentsParHeure } from "../lib/dates";
 import { ratio } from "../lib/rendus";
 import { idPhoto } from "../lib/transitions";
+import { aUneVideo, formatDuree } from "../lib/videos";
 import Photo from "./Photo";
+import PhotoAnimee from "./PhotoAnimee";
 import styles from "./GaleriePhotos.module.css";
 
 type Props = { slug: string; date: string; photos: PhotoJour[] };
@@ -46,7 +48,14 @@ function Rangees({ slug, date, photos }: Props) {
         const r = ratio(photo);
         // Largeur affichée ≈ ratio × hauteur de rangée (avec marge pour l'étirement).
         const sizes = `(min-width: 1200px) ${Math.round(r * 320 * 1.5)}px, (min-width: 700px) ${Math.round(r * 260 * 1.5)}px, min(100vw, ${Math.round(r * 110 * 2)}px)`;
-        const alt = photo.legende || `Photo du ${dateCourte(date)}${photo.prise_le ? ` à ${heureLocale(photo.prise_le)}` : ""}`;
+        const nature = photo.type === "video" ? "Vidéo" : "Photo";
+        const alt = photo.legende || `${nature} du ${dateCourte(date)}${photo.prise_le ? ` à ${heureLocale(photo.prise_le)}` : ""}`;
+        const image =
+          photo.type === "animee" && aUneVideo(photo) ? (
+            <PhotoAnimee photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} />
+          ) : (
+            <Photo photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} />
+          );
         return (
           <li key={photo.id} className={styles.cellule} style={{ "--ratio": r } as CSSProperties}>
             <Link
@@ -56,7 +65,13 @@ function Rangees({ slug, date, photos }: Props) {
               state={{ depuisJour: true }}
               className={styles.lien}
             >
-              <Photo photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} />
+              {image}
+              {photo.type === "video" && (
+                <span className={styles.badgeVideo} aria-hidden="true">
+                  <span className={styles.triangle}>▶</span>
+                  {formatDuree(photo.duree)}
+                </span>
+              )}
               {photo.favori && (
                 <span className={styles.favori} title="Favori" aria-label="Favori">
                   ★

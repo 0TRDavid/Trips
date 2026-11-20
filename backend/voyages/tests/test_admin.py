@@ -13,7 +13,7 @@ from voyages.admin import lancer_regeneration
 from voyages.generation import photos_a_traiter
 from voyages.models import Jour, Photo
 
-from .donnees import creer_voyage
+from .donnees import creer_photo, creer_voyage
 
 
 class AdminTests(TestCase):
@@ -51,6 +51,20 @@ class AdminTests(TestCase):
         ]
         for url in urls:
             self.assertEqual(self.client.get(url).status_code, 200, url)
+
+    def test_media_video_et_photo_animee(self):
+        video = creer_photo(self.jour, 5, type=Photo.Type.VIDEO, duree=54.1, videos_etag=f"e{self.jour.pk}-5")
+        animee = creer_photo(self.jour, 6, type=Photo.Type.ANIMEE, duree=3.1)
+
+        page = self.client.get(reverse("admin:voyages_photo_change", args=[video.pk])).content.decode()
+        self.assertIn(f'<video src="/media/rendus/{video.pk}/abc-video_720.mp4"', page)
+        self.assertNotIn("autoplay", page)
+        page = self.client.get(reverse("admin:voyages_photo_change", args=[animee.pk])).content.decode()
+        self.assertIn("muted loop autoplay", page)
+
+        liste = self.client.get(reverse("admin:voyages_photo_changelist") + "?type__exact=video").content.decode()
+        self.assertIn(str(video), liste)
+        self.assertNotIn(str(animee), liste)
 
     def test_interface_en_francais(self):
         contenu = self.client.get(reverse("admin:voyages_jour_changelist")).content.decode()
@@ -196,6 +210,6 @@ class GenererRendusPhotosTests(TestCase):
 
         call_command("generer_rendus", "--dry-run", "--force", "--photos", f"{ids[0]},{ids[2]}", stdout=sortie)
 
-        self.assertIn("Rendus web à générer : 2 (sur 2 photos)", sortie.getvalue())
+        self.assertIn("Rendus web à générer : 2 (sur 2 médias)", sortie.getvalue())
         a_faire, total = photos_a_traiter(force=True, photos_ids=[ids[0], ids[2]])
         self.assertEqual(([p.id for p in a_faire], total), ([ids[0], ids[2]], 2))

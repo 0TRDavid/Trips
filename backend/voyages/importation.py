@@ -1,4 +1,7 @@
-"""Import d'un dossier Nextcloud en Voyage, Jours et Photos.
+"""Import d'un dossier Nextcloud en Voyage, Jours et Photos (médias).
+
+Médias : photos (HEIC, JPEG, CR2), photos animées (HEIC Samsung qui embarque
+une vidéo) et vidéos (.mp4, .mov, lues en flux par ffprobe, jamais téléchargées).
 
 Relançable : une photo dont l'etag n'a pas changé n'est ni retéléchargée ni
 modifiée. Une photo déplacée dans Nextcloud (même etag, même nom, autre dossier)
@@ -23,9 +26,17 @@ from django.db.models import F, Max, Min
 from django.utils import timezone
 from django.utils.text import slugify
 
-from .exif import analyser_decalage, extraire_metadonnees
+from .exif import Metadonnees, analyser_decalage, extraire_metadonnees
 from .models import Jour, Photo, Voyage
 from .nextcloud import FichierDistant, normaliser
+from .video import (
+    HORLOGE_NOM_DE_FICHIER,
+    VideoErreur,
+    metadonnees_video,
+    nom_porte_une_date,
+    sonder,
+    video_embarquee,
+)
 
 
 class ImportErreur(Exception):
@@ -35,11 +46,18 @@ class ImportErreur(Exception):
 class Client(Protocol):
     def lister(self, dossier: str) -> list[FichierDistant]: ...
     def telecharger(self, chemin: str, limite: int | None = None) -> bytes: ...
+    def entree_video(self, chemin: str): ...  # gestionnaire de contexte → Entree
 
 
 # Formats dont les EXIF sont en tête de fichier : inutile de télécharger les
 # 20 à 30 Mo d'un RAW pour lire sa date.
 OCTETS_EN_TETE = {".cr2": 256 * 1024}
+
+# Version de l'analyse faite à l'import. Une photo analysée par une version plus
+# ancienne est relue une fois, même si son etag n'a pas changé :
+#   1 : détection des photos animées (HEIC).
+VERSION_ANALYSE = 1
+EXTENSIONS_A_REANALYSER = {".heic", ".heif"}
 
 
 @dataclass
@@ -53,6 +71,12 @@ class Rapport:
     inchangees: int = 0
     deplacees: int = 0
     sans_date: list[str] = field(default_factory=list)
+    # Photos relues pour une nouvelle analyse (VERSION_ANALYSE), etag inchangé.
+    reanalysees: int = 0
+    # Médias en base par type (photo, animee, video), après l'import.
+    types: Counter = field(default_factory=Counter)
+    # Médias illisibles (vidéo que ffprobe ne lit pas…), retentés à la relance.
+    erreurs: list[tuple[str, str]] = field(default_factory=list)
     ignores: Counter = field(default_factory=Counter)
     disparues: list[str] = field(default_factory=list)
     dry_run: bool = False
@@ -90,7 +114,7 @@ def importer_voyage(
     rapport = Rapport(dossier=dossier, dry_run=dry_run, limite=limite)
 
     fichiers = client.lister(dossier)
-    images = [f for f in fichiers if f.est_image]
+    images = [f for f in fichiers if f.est_media]  # photos et vidéos
 
     voyage = Voyage.objects.filter(dossier_nextcloud=dossier).first()
     if voyage is None and ancien_dossier:
@@ -120,10 +144,12 @@ def importer_voyage(
     horloges = {**anciennes_horloges, **(horloges or {})}
     horloges_tz = {appareil: charger_horloge(valeur) for appareil, valeur in horloges.items()}
     # Les photos de ces appareils doivent être relues, même si leur etag n'a pas changé.
+    # (« nom de fichier » : les vidéos dont le nom porte une date.)
     appareils_a_relire = {a for a, v in horloges.items() if anciennes_horloges.get(a) != v}
+    noms_a_relire = HORLOGE_NOM_DE_FICHIER in appareils_a_relire
 
     rapport.images_nextcloud = len(images)
-    rapport.ignores = Counter(f.extension or "(sans extension)" for f in fichiers if not f.est_image)
+    rapport.ignores = Counter(f.extension or "(sans extension)" for f in fichiers if not f.est_media)
 
     existantes = (
         {p.chemin_nextcloud: p for p in Photo.objects.filter(jour__voyage=voyage)}
@@ -138,8 +164,16 @@ def importer_voyage(
 
     a_traiter = images[:limite] if limite else images
 
+    def a_reanalyser(photo, fichier):
+        return fichier.extension in EXTENSIONS_A_REANALYSER and photo.version_analyse < VERSION_ANALYSE
+
     def a_jour(photo, fichier):
-        return photo.etag == fichier.etag and photo.appareil not in appareils_a_relire
+        return (
+            photo.etag == fichier.etag
+            and photo.appareil not in appareils_a_relire
+            and not (noms_a_relire and fichier.est_video and nom_porte_une_date(fichier.chemin))
+            and not a_reanalyser(photo, fichier)
+        )
 
     if dry_run:
         for fichier in a_traiter:
@@ -190,6 +224,8 @@ def importer_voyage(
                 photo.photographe = photographe
                 photo.save(update_fields=["photographe"])
             continue
+        if photo is not None and photo.etag == fichier.etag and a_reanalyser(photo, fichier):
+            rapport.reanalysees += 1
         _importer_photo(client, voyage, tz, horloges_tz, fichier, photo, rapport, dossier)
 
     # Mémorisées seulement une fois les photos relues : si l'import est
@@ -199,6 +235,7 @@ def importer_voyage(
         voyage.save(update_fields=["horloges_appareils"])
     _mettre_a_jour_dates(voyage)
     rapport.photos_en_base = Photo.objects.filter(jour__voyage=voyage).count()
+    rapport.types = Counter(Photo.objects.filter(jour__voyage=voyage).values_list("type", flat=True))
     return rapport
 
 
@@ -244,20 +281,38 @@ def _reperer_deplacements(existantes: dict[str, Photo], images, chemins_distants
     return deplacements
 
 
-def _lire_metadonnees(client, fichier: FichierDistant, tz, horloges_tz):
-    """Télécharge en mémoire (l'en-tête seulement si possible) et lit les EXIF."""
+def _lire_metadonnees(client, fichier: FichierDistant, tz, horloges_tz) -> tuple[Metadonnees, str]:
+    """Renvoie (métadonnées, type du média).
+
+    Photo : téléchargée en mémoire (l'en-tête seulement si possible), EXIF lus,
+    vidéo embarquée cherchée dans un HEIC. Vidéo : ffprobe la lit en flux.
+    """
+    if fichier.est_video:
+        with client.entree_video(fichier.chemin) as entree:
+            sonde = sonder(entree)
+        return metadonnees_video(sonde, tz, horloges_tz, fichier.chemin), Photo.Type.VIDEO
+
     limite = OCTETS_EN_TETE.get(fichier.extension)
     if limite:
         meta = extraire_metadonnees(client.telecharger(fichier.chemin, limite=limite), tz, horloges_tz)
         if meta.prise_le is not None:
-            return meta
+            return meta, Photo.Type.PHOTO
         # En-tête insuffisant : on se rabat sur le fichier complet.
-    return extraire_metadonnees(client.telecharger(fichier.chemin), tz, horloges_tz)
+    octets = client.telecharger(fichier.chemin)
+    meta = extraire_metadonnees(octets, tz, horloges_tz)
+    if fichier.extension in EXTENSIONS_A_REANALYSER and video_embarquee(octets) is not None:
+        return meta, Photo.Type.ANIMEE
+    return meta, Photo.Type.PHOTO
 
 
 def _importer_photo(client, voyage, tz, horloges_tz, fichier: FichierDistant, photo: Photo | None, rapport, dossier):
-    # Le fichier n'existe qu'en mémoire, le temps de lire ses EXIF.
-    meta = _lire_metadonnees(client, fichier, tz, horloges_tz)
+    # Le fichier n'existe qu'en mémoire, le temps de lire ses métadonnées.
+    try:
+        meta, type_media = _lire_metadonnees(client, fichier, tz, horloges_tz)
+    except VideoErreur as exc:
+        # Vidéo illisible : signalée, et retentée à la prochaine relance.
+        rapport.erreurs.append((fichier.chemin, str(exc)))
+        return
 
     sans_date = meta.prise_le is None
     if sans_date:
@@ -279,6 +334,9 @@ def _importer_photo(client, voyage, tz, horloges_tz, fichier: FichierDistant, ph
             appareil=meta.appareil,
             photographe=photographe_depuis_chemin(dossier, fichier.chemin),
             orientation=meta.orientation,
+            type=type_media,
+            duree=meta.duree,
+            version_analyse=VERSION_ANALYSE,
         )
         if photo is None:
             # Sans date fiable, la photo est masquée en attendant une décision dans l'admin.
@@ -308,9 +366,13 @@ def _rang_chronologique(jour: Jour, prise_le) -> int:
 
 
 def _mettre_a_jour_dates(voyage: Voyage):
-    bornes = Jour.objects.filter(voyage=voyage, photos__isnull=False).aggregate(
-        debut=Min("date"), fin=Max("date")
-    )
+    """Début et fin du voyage : jours qui ont un média visible. Les médias
+    masqués (sans date, rangés à la date du fichier) n'étirent pas le voyage ;
+    s'il n'y a que ça, on les prend quand même."""
+    jours = Jour.objects.filter(voyage=voyage)
+    bornes = jours.filter(photos__visible=True).aggregate(debut=Min("date"), fin=Max("date"))
+    if bornes["debut"] is None:
+        bornes = jours.filter(photos__isnull=False).aggregate(debut=Min("date"), fin=Max("date"))
     voyage.date_debut, voyage.date_fin = bornes["debut"], bornes["fin"]
     voyage.save(update_fields=["date_debut", "date_fin"])
 

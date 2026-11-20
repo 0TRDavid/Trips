@@ -53,6 +53,8 @@ class AnalysePropfindTests(SimpleTestCase):
             [e.chemin for e in elements if e.est_image],
             ["V/a.HEIC", "V/b.heif", "V/c.jpg", "V/d.JPEG", "V/h.CR2"],
         )
+        self.assertEqual([e.chemin for e in elements if e.est_video], ["V/e.MOV"])
+        self.assertEqual(len([e for e in elements if e.est_media]), 6)
 
     def test_propriete_en_erreur_ignoree(self):
         xml = multistatus(reponse_dav(PREFIXE + "V/a.jpg", statut="HTTP/1.1 404 Not Found"))

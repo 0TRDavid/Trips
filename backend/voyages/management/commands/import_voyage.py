@@ -24,7 +24,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--horloge", action="append", default=[], metavar="APPAREIL=FUSEAU",
             help="Horloge d'un appareil sans décalage EXIF, mémorisée sur le voyage "
-                 "(ex. \"Canon EOS 100D=UTC\"). Répétable.",
+                 "(ex. \"Canon EOS 100D=UTC\"). Répétable. « nom de fichier=Europe/Paris » : "
+                 "une vidéo nommée « AA-MM-JJ HH-MM-SS… » est datée par son nom, lu dans ce fuseau.",
         )
         parser.add_argument(
             "--ancien-dossier", metavar="DOSSIER",
@@ -105,18 +106,27 @@ class Command(BaseCommand):
                 w(f"  dossier {verbe} : « {r.renomme_depuis} » → « {r.dossier} »")
             for appareil, fuseau in r.voyage.horloges_appareils.items():
                 w(f"  horloge {appareil} : {fuseau}")
-        w(f"Images dans Nextcloud : {r.images_nextcloud}")
-        w(f"Photos en base        : {r.photos_en_base}")
-        w(f"  créées {r.creees} · mises à jour {r.mises_a_jour} · inchangées {r.inchangees}")
+        w(f"Médias dans Nextcloud : {r.images_nextcloud} (photos et vidéos)")
+        w(f"Médias en base        : {r.photos_en_base}")
+        if r.types:
+            noms = {"photo": "photos", "animee": "photos animées", "video": "vidéos"}
+            w("  dont " + " · ".join(f"{noms.get(t, t)} {n}" for t, n in sorted(r.types.items())))
+        w(f"  créés {r.creees} · mis à jour {r.mises_a_jour} · inchangés {r.inchangees}")
+        if r.reanalysees:
+            w(f"  dont relus pour la nouvelle analyse (photos animées) : {r.reanalysees}")
         if r.deplacees:
             w(f"  dont déplacées dans Nextcloud (reconnues, non réimportées) : {r.deplacees}")
         if r.ignores:
             detail = ", ".join(f"{ext} : {n}" for ext, n in sorted(r.ignores.items()))
             w(f"Fichiers ignorés      : {sum(r.ignores.values())} ({detail})")
         if r.sans_date:
-            w(self.style.WARNING(f"Sans date EXIF (date du fichier, masquées) : {len(r.sans_date)}"))
+            w(self.style.WARNING(f"Sans date de prise de vue (date du fichier, masqués) : {len(r.sans_date)}"))
             for chemin in r.sans_date:
                 w(f"  - {chemin}")
+        if r.erreurs:
+            w(self.style.WARNING(f"Illisibles (retentés à la prochaine relance) : {len(r.erreurs)}"))
+            for chemin, message in r.erreurs:
+                w(f"  - {chemin} : {message}")
         if r.disparues:
             w(self.style.WARNING(f"En base mais absentes de Nextcloud (conservées) : {len(r.disparues)}"))
             for chemin in r.disparues:
@@ -125,6 +135,6 @@ class Command(BaseCommand):
             if r.limite:
                 w(f"(--limite {r.limite} : écart normal, relance sans --limite pour tout importer)")
             elif r.images_nextcloud == r.photos_en_base:
-                w(self.style.SUCCESS(f"✔ Nextcloud et la base concordent : {r.photos_en_base} photos"))
+                w(self.style.SUCCESS(f"✔ Nextcloud et la base concordent : {r.photos_en_base} médias"))
             else:
                 w(self.style.WARNING(f"≠ Écart : {r.images_nextcloud} dans Nextcloud, {r.photos_en_base} en base"))

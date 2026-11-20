@@ -58,10 +58,28 @@ class Jour(models.Model):
 
 
 class Photo(models.Model):
+    """Un média du voyage : photo, photo animée ou vidéo.
+
+    La classe garde le nom « Photo » (routes, couverture, admin, front) ; le
+    type distingue les trois cas. Une photo animée est une photo dont le
+    fichier embarque une courte vidéo (Samsung) ; son image fixe sert d'aperçu.
+    """
+
+    class Type(models.TextChoices):
+        PHOTO = "photo", "photo"
+        ANIMEE = "animee", "photo animée"
+        VIDEO = "video", "vidéo"
+
     jour = models.ForeignKey(Jour, on_delete=models.CASCADE, related_name="photos", verbose_name="jour")
     chemin_nextcloud = models.CharField("chemin Nextcloud", max_length=1000, unique=True)
     # L'etag Nextcloud change quand le fichier change : sert à éviter les réimports.
     etag = models.CharField("etag", max_length=200)
+    type = models.CharField("type", max_length=10, choices=Type.choices, default=Type.PHOTO)
+    # Durée de la vidéo (ou de la vidéo embarquée d'une photo animée), en secondes.
+    duree = models.FloatField("durée (s)", null=True, blank=True)
+    # Version de l'analyse faite à l'import : une photo analysée par une version
+    # plus ancienne est relue une fois (ex. détection des photos animées).
+    version_analyse = models.PositiveSmallIntegerField("version de l'analyse", default=0)
     prise_le = models.DateTimeField("prise le", help_text="UTC")
     latitude = models.FloatField("latitude", null=True, blank=True)
     longitude = models.FloatField("longitude", null=True, blank=True)
@@ -84,26 +102,33 @@ class Photo(models.Model):
     placeholder = models.CharField("placeholder", max_length=100, blank=True, help_text="ThumbHash en base64")
     # Etag de l'original pour lequel les rendus ont été générés (vide : à faire).
     rendus_etag = models.CharField("etag des rendus", max_length=200, blank=True)
+    # Idem pour les rendus vidéo (photo animée, vidéo) : les deux pistes se
+    # régénèrent indépendamment.
+    videos_etag = models.CharField("etag des rendus vidéo", max_length=200, blank=True)
 
     class Meta:
         ordering = ["jour", "ordre", "prise_le"]
-        verbose_name = "photo"
+        verbose_name = "média"
+        verbose_name_plural = "médias"
 
     def __str__(self):
         return self.chemin_nextcloud.rsplit("/", 1)[-1]
 
 
 class Rendu(models.Model):
-    """Version web d'une photo, sans métadonnées, dans le cache (MEDIA_ROOT)."""
+    """Version web d'un média, sans métadonnées, dans le cache (MEDIA_ROOT) :
+    image WebP (photo, ou aperçu d'une vidéo) ou vidéo MP4."""
 
     class Taille(models.TextChoices):
         MINIATURE = "miniature"
         MOYENNE = "moyenne"
         GRANDE = "grande"
+        VIDEO_720 = "video_720"
+        VIDEO_1080 = "video_1080"
 
     photo = models.ForeignKey(Photo, on_delete=models.CASCADE, related_name="rendus", verbose_name="photo")
     taille = models.CharField(max_length=20, choices=Taille.choices)
-    format = models.CharField(max_length=10, default="webp")
+    format = models.CharField(max_length=10, default="webp")  # webp ou mp4
     largeur = models.PositiveIntegerField()
     hauteur = models.PositiveIntegerField()
     octets = models.PositiveIntegerField()

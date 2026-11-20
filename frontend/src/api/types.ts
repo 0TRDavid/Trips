@@ -21,8 +21,22 @@ export type PhotoResume = {
   rendus: Partial<Record<TailleRendu, Rendu>>;
 };
 
-/** Photo dans la page d'un jour. */
+/** photo, photo animée (HEIC Samsung avec une courte vidéo) ou vidéo. */
+export type TypeMedia = "photo" | "animee" | "video";
+
+/** Vidéos MP4 par petit côté visé ("720", "1080") ; une seule si la source est petite. */
+export type VideosMedia = Partial<Record<"720" | "1080", Rendu>>;
+
+/**
+ * Photo dans la page d'un jour : en fait un média. Pour une vidéo, `rendus`
+ * contient son image d'aperçu (poster) ; pour une photo animée, son image fixe.
+ */
 export type PhotoJour = PhotoResume & {
+  type: TypeMedia;
+  /** Durée en secondes (vidéo, ou vidéo d'une photo animée) ; null pour une photo. */
+  duree: number | null;
+  /** Vide pour une photo. */
+  videos: VideosMedia;
   /** ISO 8601 avec le décalage du voyage, ex. "2025-06-02T09:56:24+09:00". */
   prise_le: string | null;
   legende: string;
