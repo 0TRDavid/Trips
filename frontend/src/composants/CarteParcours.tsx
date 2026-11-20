@@ -11,10 +11,10 @@ import styles from "./CarteParcours.module.css";
 
 /**
  * Tuiles vectorielles OpenFreeMap : gratuites, sans clé ni compte.
- * Le style « positron » est sobre ; à la v2, on le remplacera par un style
+ * Style « liberty », en couleur ; à la v2, on le remplacera par un style
  * maison (Maputnik) sur les mêmes tuiles. Voir docs/decisions.md.
  */
-const STYLE = "https://tiles.openfreemap.org/styles/positron";
+const STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 setWorkerUrl(urlWorker);
 
