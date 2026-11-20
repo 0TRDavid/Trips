@@ -1,3 +1,33 @@
+.moments {
+  display: grid;
+  gap: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.moment {
+  display: grid;
+  gap: 0.6rem;
+}
+
+/* Intitulé d'heure : petit, discret, prolongé par un filet. */
+.heure {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  font-family: var(--police-titre);
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--encre-2);
+}
+
+.heure::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--filet);
+}
+
 .galerie {
   /* 110 px : deux paysages 4:3 tiennent côte à côte sur un téléphone de 375 px. */
   --h: 110px;
