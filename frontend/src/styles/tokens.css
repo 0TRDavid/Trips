@@ -1,0 +1,23 @@
+/* Palette et typographie PROVISOIRES (étape 5). Tout le reste du CSS passe
+   par ces variables : l'étape 6 pourra les remplacer sans toucher aux
+   composants. */
+:root {
+  --papier: #f6f3ee;
+  --papier-2: #ece7df;
+  --encre: #1d1b18;
+  --encre-2: #5d5850;
+  --encre-3: #8a847a;
+  --filet: #d9d2c6;
+  --accent: #b4532a;
+  --accent-doux: #e9c9b8;
+  --nuit: #0b0b0b;
+  --nuit-texte: #e9e6e1;
+
+  --police-titre: "Fraunces Variable", Georgia, "Times New Roman", serif;
+  --police-texte: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --marge: clamp(1rem, 4vw, 3rem);
+  --largeur-max: 1400px;
+  --largeur-lecture: 38rem;
+  --rayon: 6px;
+}

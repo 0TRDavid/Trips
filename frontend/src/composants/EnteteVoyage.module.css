@@ -1,0 +1,44 @@
+.entete {
+  padding: 0 var(--marge);
+  max-width: var(--largeur-max);
+  width: 100%;
+  margin: 0 auto;
+}
+
+.visuel {
+  position: relative;
+  /* Au plus un quart de l'écran, sur téléphone comme sur ordinateur
+     (svh : hauteur sans la barre d'adresse mobile, qui change en défilant). */
+  height: 25vh;
+  height: 25svh;
+  border-radius: var(--rayon);
+  overflow: hidden;
+  background: var(--papier-2);
+}
+
+.voile {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.6), rgb(0 0 0 / 0.15) 70%, rgb(0 0 0 / 0));
+  pointer-events: none;
+}
+
+.texte {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: clamp(0.9rem, 3vw, 2rem);
+  color: #fff;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.titre {
+  font-size: clamp(2rem, 6vw, 4rem);
+}
+
+.meta {
+  font-size: clamp(0.95rem, 2vw, 1.1rem);
+  opacity: 0.9;
+}

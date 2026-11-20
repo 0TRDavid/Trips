@@ -1,0 +1,38 @@
+.carte {
+  display: grid;
+  gap: 0.9rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.visuel {
+  aspect-ratio: 4 / 5;
+  border-radius: var(--rayon);
+  overflow: hidden;
+  background: var(--papier-2);
+}
+
+.vide {
+  width: 100%;
+  height: 100%;
+}
+
+.texte {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.titre {
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+}
+
+.carte:hover .titre {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.meta {
+  color: var(--encre-2);
+  font-size: 0.95rem;
+}

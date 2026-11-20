@@ -1,0 +1,39 @@
+.recit {
+  max-width: var(--largeur-lecture);
+  font-size: 1.075rem;
+  line-height: 1.75;
+  overflow-wrap: break-word;
+}
+
+.recit > * + * {
+  margin-top: 1em;
+}
+
+.recit :where(p, ul, ol, blockquote, pre, h2, h3, h4) {
+  margin-bottom: 0;
+}
+
+.recit :where(h2, h3, h4) {
+  margin-top: 1.8em;
+  font-size: 1.35rem;
+}
+
+.recit blockquote {
+  margin-left: 0;
+  padding-left: 1rem;
+  border-left: 2px solid var(--accent-doux);
+  color: var(--encre-2);
+  font-style: italic;
+}
+
+.recit a {
+  color: var(--accent);
+}
+
+.recit pre {
+  overflow-x: auto;
+  background: var(--papier-2);
+  padding: 0.8rem 1rem;
+  border-radius: var(--rayon);
+  font-size: 0.9rem;
+}
