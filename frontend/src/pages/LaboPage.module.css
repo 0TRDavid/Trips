@@ -75,6 +75,25 @@
 }
 
 
+.choix {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  align-items: start;
+  font-size: 0.85rem;
+  color: var(--encre-2);
+  cursor: pointer;
+}
+
+.option strong {
+  color: var(--encre);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -118,19 +137,20 @@
   box-shadow: 0 2px 18px rgb(0 0 0 / 0.18);
 }
 
-/* Ordinateur : rendu à 1280 × 800, affiché à moitié (transform sur l'iframe). */
+/* Ordinateur : rendu à la taille choisie, réduit à 900 px de large
+   (transform sur l'iframe ; --ecran-l, --ecran-h, --echelle posés en ligne). */
 .cadrePc {
-  width: 640px;
-  height: 400px;
+  width: calc(var(--ecran-l) * var(--echelle));
+  height: calc(var(--ecran-h) * var(--echelle));
   overflow: hidden;
   border-radius: 8px;
   box-shadow: 0 2px 18px rgb(0 0 0 / 0.18);
 }
 
 .cadrePc iframe {
-  width: 1280px;
-  height: 800px;
-  transform: scale(0.5);
+  width: var(--ecran-l);
+  height: var(--ecran-h);
+  transform: scale(var(--echelle));
   transform-origin: 0 0;
 }
 

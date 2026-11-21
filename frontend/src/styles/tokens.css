@@ -30,4 +30,17 @@
   --largeur-lecture: 38rem;
   --rayon: 6px;
   --hauteur-entete: 3.4rem;
+
+  /* Largeur des pages : variantes comparées au labo (styles/labo-largeur.css). */
+  --debord: 0px; /* les visuels (couvertures, carte) mangent la marge de côté */
+  --rayon-visuel: var(--rayon);
+  --carte-min: 320px; /* largeur mini d'une carte de voyage (accueil) */
+  --h-galerie-large: 320px; /* hauteur de rangée de la galerie, écran ≥ 1200 px */
+  --carte-haut: 1rem; /* carte du voyage collante (ordinateur) */
+  --carte-hauteur: calc(100vh - 2rem);
+  --carte-hauteur-max: 820px;
+  --jour-colonnes: minmax(0, 1fr); /* page jour : une colonne, ou récit à côté */
+  --jour-recit-colonne: auto;
+  --jour-suite-colonne: auto;
+  --jour-recit-position: static;
 }

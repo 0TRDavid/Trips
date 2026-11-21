@@ -65,9 +65,14 @@ export type Reglages = {
   ralenti: number;
   /** Simule `prefers-reduced-motion: reduce`. */
   reduit: boolean;
+  /** Variante de largeur des pages (temporaire, styles/labo-largeur.css). */
+  largeur: Largeur;
 };
 
-export const REGLAGES_DEFAUT: Reglages = { ralenti: 1, reduit: false };
+export const LARGEURS = ["actuelle", "large", "fond", "colonnes"] as const;
+export type Largeur = (typeof LARGEURS)[number];
+
+export const REGLAGES_DEFAUT: Reglages = { ralenti: 1, reduit: false, largeur: "actuelle" };
 
 export const CLE_REGLAGES = "carnet-labo";
 export const EVENEMENT_REGLAGES = "carnet-reglages";
@@ -82,6 +87,7 @@ function lireReglages(): Reglages {
     return {
       ralenti: typeof lu.ralenti === "number" && lu.ralenti > 0 ? lu.ralenti : 1,
       reduit: lu.reduit === true,
+      largeur: LARGEURS.includes(lu.largeur as Largeur) ? (lu.largeur as Largeur) : "actuelle",
     };
   } catch {
     return REGLAGES_DEFAUT;
@@ -105,6 +111,18 @@ export function reglages(): Reglages {
 }
 
 /** Enregistre des réglages (labo). */
+/** Pose la variante de largeur sur <html> (dev), et la suit si le labo la change. */
+export function appliquerLargeur() {
+  if (!import.meta.env.DEV) return;
+  const poser = () => {
+    const l = reglages().largeur;
+    if (l === "actuelle") delete document.documentElement.dataset.largeur;
+    else document.documentElement.dataset.largeur = l;
+  };
+  poser();
+  window.addEventListener(EVENEMENT_REGLAGES, poser);
+}
+
 export function enregistrerReglages(r: Reglages) {
   cache = r;
   try {

@@ -6,13 +6,15 @@ import "@fontsource-variable/fraunces";
 import "@fontsource-variable/inter";
 import "./styles/global.css";
 import { queryClient } from "./api/requetes";
-import { publierDureesCss } from "./lib/mouvement";
+import { appliquerLargeur, publierDureesCss } from "./lib/mouvement";
 import { router } from "./routes";
 
 publierDureesCss();
 
 // Dev seulement : la page /labo pilote le site affiché dans ses iframes.
 if (import.meta.env.DEV) {
+  import("./styles/labo-largeur.css");
+  appliquerLargeur();
   (window as unknown as { __carnet: unknown }).__carnet = {
     naviguer: (vers: string, options?: Parameters<typeof router.navigate>[1]) => router.navigate(vers, options),
     retour: () => router.navigate(-1),

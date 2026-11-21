@@ -84,11 +84,11 @@
   }
 
   .zoneCarte {
-    top: 1rem;
-    height: calc(100vh - 2rem);
-    max-height: 820px;
-    margin: 0;
-    border-radius: var(--rayon);
+    top: var(--carte-haut);
+    height: var(--carte-hauteur);
+    max-height: var(--carte-hauteur-max);
+    margin: 0 0 0 calc(-1 * var(--debord));
+    border-radius: var(--rayon-visuel);
     overflow: hidden;
     box-shadow: none;
   }
