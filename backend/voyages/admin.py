@@ -34,6 +34,7 @@ from django.utils.safestring import mark_safe
 from django.utils.http import urlencode
 
 from . import admin_completion
+from .generation import cle_rendus
 from .markdown import rendre_markdown
 from .models import Jour, Photo, Voyage
 from .widgets import ChoixCouverture, EditeurMarkdown, url_miniature
@@ -88,6 +89,44 @@ def _action_regenerer(modeladmin, request, photos):
 @admin.action(description="Régénérer les rendus des photos sélectionnées")
 def regenerer_photos(modeladmin, request, queryset):
     _action_regenerer(modeladmin, request, Photo.objects.filter(id__in=queryset.values("id")))
+
+
+def tourner_photos(photos, quart_de_tours: int) -> list[int]:
+    """Ajoute la rotation à chaque média (modulo 360) ; renvoie les ids modifiés."""
+    ids = []
+    for photo in photos:
+        photo.rotation = (photo.rotation + 90 * quart_de_tours) % 360
+        photo.save(update_fields=["rotation"])
+        ids.append(photo.id)
+    return ids
+
+
+def apres_rotation(modeladmin, request, ids: list[int]):
+    """Nouveaux rendus (photo et vidéo) et sidecar XMP, en arrière-plan."""
+    if not ids:
+        return
+    lancer_regeneration(ids)
+    admin_completion.lancer_export_xmp(ids)
+    modeladmin.message_user(
+        request,
+        f"Rotation enregistrée pour {len(ids)} média{'s' if len(ids) > 1 else ''} ; nouveaux rendus en cours "
+        "de génération (quelques secondes par photo, suivi : docker compose logs -f backend).",
+        messages.SUCCESS,
+    )
+
+
+def _action_tourner(quart_de_tours: int, description: str):
+    @admin.action(description=description)
+    def action(modeladmin, request, queryset):
+        apres_rotation(modeladmin, request, tourner_photos(queryset, quart_de_tours))
+
+    action.__name__ = f"tourner_{quart_de_tours}"
+    return action
+
+
+tourner_droite = _action_tourner(1, "Tourner d'¼ de tour à droite ↻")
+tourner_gauche = _action_tourner(3, "Tourner d'¼ de tour à gauche ↺")
+demi_tour = _action_tourner(2, "Retourner (demi-tour)")
 
 
 @admin.action(description="Régénérer les rendus des jours sélectionnés")
@@ -299,13 +338,19 @@ class PhotoEnLigne(SortableTabularInline):
 
     @admin.display(description="photo")
     def apercu(self, photo):
-        return miniature(photo)
+        # Clic sur la vignette : fiche du média (rotation, date, position…).
+        url = reverse("admin:voyages_photo_change", args=[photo.pk])
+        return format_html('<a href="{}" title="Ouvrir la fiche du média">{}</a>', url, miniature(photo))
 
     @admin.display(description="heure locale")
     def heure(self, photo):
         local = photo.prise_le.astimezone(ZoneInfo(photo.jour.voyage.fuseau_horaire))
         type_ = "" if photo.type == Photo.Type.PHOTO else f" · {photo.get_type_display()}"
-        return format_html("{}<br><small>{}{}</small>", local.strftime("%H:%M"), photo, type_)
+        url = reverse("admin:voyages_photo_change", args=[photo.pk])
+        return format_html(
+            '{}<br><small>{}{}</small><br><a href="{}">Modifier le média ✎</a>',
+            local.strftime("%H:%M"), photo, type_, url,
+        )
 
 
 class JourForm(forms.ModelForm):
@@ -373,28 +418,29 @@ class JourAdmin(SortableAdminBase, admin.ModelAdmin):
 
 @admin.register(Photo)
 class PhotoAdmin(admin.ModelAdmin):
-    list_display = ["apercu", "nom", "type", "jour", "prise_le", "photographe", "favori", "visible", "rendus_a_jour"]
+    list_display = ["apercu", "nom", "type", "lien_jour", "prise_le", "photographe", "favori", "visible", "rendus_a_jour"]
     list_display_links = ["apercu", "nom"]
     list_editable = ["favori", "visible"]
     list_filter = [
         "jour__voyage", "type", "photographe", "visible", "favori", "source_date", "date_a_confirmer",
-        "source_position", "appareil",
+        "source_position", "appareil", "rotation",
     ]
     list_select_related = ["jour__voyage"]
     search_fields = ["legende", "chemin_nextcloud"]
     date_hierarchy = "prise_le"
     list_per_page = 50
     fields = [
-        "apercu_grand", "apercu_video", "legende", ("favori", "visible"), ("type", "duree"), "jour", "prise_le",
+        "lien_jour", "apercu_grand", "apercu_video", "rotation", "legende", ("favori", "visible"), ("type", "duree"),
+        "prise_le",
         ("source_date", "date_a_confirmer"), ("latitude", "longitude", "source_position"),
         "photographe", "appareil", ("largeur", "hauteur", "couleur"), "chemin_nextcloud",
     ]
     readonly_fields = [
-        "apercu_grand", "apercu_video", "type", "duree", "jour", "prise_le", "photographe", "appareil",
+        "lien_jour", "apercu_grand", "apercu_video", "type", "duree", "prise_le", "photographe", "appareil",
         "largeur", "hauteur", "couleur", "chemin_nextcloud",
         "source_date", "date_a_confirmer", "latitude", "longitude", "source_position",
     ]
-    actions = [regenerer_photos]
+    actions = [tourner_droite, tourner_gauche, demi_tour, regenerer_photos]
     change_list_template = "admin/voyages/photo/change_list.html"
 
     def has_add_permission(self, request):
@@ -402,6 +448,11 @@ class PhotoAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         return [*admin_completion.urls(self.admin_site), *super().get_urls()]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if "rotation" in form.changed_data:
+            apres_rotation(self, request, [obj.id])
 
     def has_delete_permission(self, request, obj=None):
         return False  # une photo disparue de Nextcloud est signalée par l'import, pas supprimée ici
@@ -430,14 +481,21 @@ class PhotoAdmin(admin.ModelAdmin):
             mark_safe(" muted loop autoplay") if animee else "",
         )
 
+    @admin.display(description="jour", ordering="jour__date")
+    def lien_jour(self, photo):
+        """Lien vers la journée du média (récit, ordre et légendes de tout le jour)."""
+        url = reverse("admin:voyages_jour_change", args=[photo.jour_id])
+        titre = f" · {photo.jour.titre}" if photo.jour.titre else ""
+        return format_html('<a href="{}">← {}{}</a>', url, photo.jour.date.strftime("%d/%m/%Y"), titre)
+
     @admin.display(description="fichier", ordering="chemin_nextcloud")
     def nom(self, photo):
         return str(photo)
 
     @admin.display(description="rendus à jour", boolean=True)
     def rendus_a_jour(self, photo):
-        images = bool(photo.rendus_etag) and photo.rendus_etag == photo.etag
-        videos = photo.type == Photo.Type.PHOTO or photo.videos_etag == photo.etag
+        images = bool(photo.rendus_etag) and photo.rendus_etag == cle_rendus(photo)
+        videos = photo.type == Photo.Type.PHOTO or photo.videos_etag == cle_rendus(photo)
         return images and videos
 
     class Media:

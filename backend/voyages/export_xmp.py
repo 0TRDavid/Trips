@@ -35,7 +35,7 @@ class RapportExport:
 def photos_avec_saisie(queryset=None):
     queryset = Photo.objects.all() if queryset is None else queryset
     return (
-        queryset.filter(Q(source_date=Source.MANUEL) | Q(source_position=Source.MANUEL))
+        queryset.filter(Q(source_date=Source.MANUEL) | Q(source_position=Source.MANUEL) | ~Q(rotation=0))
         .select_related("jour__voyage")
         .order_by("jour__voyage", "chemin_nextcloud")
     )
