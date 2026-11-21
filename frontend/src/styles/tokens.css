@@ -47,6 +47,7 @@
   --parcours-min: auto;
   --jours-defilement: visible;
   --carte-flex: none;
+  --carte-hauteur-min: auto;
   --carte-haut: 1rem; /* carte du voyage collante (ordinateur) */
   --carte-hauteur: calc(100vh - 2rem);
   --carte-hauteur-max: 820px;

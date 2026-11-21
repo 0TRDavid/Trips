@@ -2,13 +2,6 @@
   padding-bottom: var(--voyage-bas);
 }
 
-.intro {
-  padding: clamp(2rem, 5vw, 4rem) var(--marge) 0;
-  max-width: var(--largeur-max);
-  margin: 0 auto;
-  width: 100%;
-}
-
 .parcours {
   max-width: var(--largeur-max);
   width: 100%;
@@ -82,10 +75,9 @@
   display: contents;
 }
 
-/* Le titre est alors un bloc du parcours : on retire l'espace entre blocs,
-   pour qu'il soit aussi près de la carte que « Jour après jour » de sa liste. */
-.colCarte > .titreSection {
-  margin-bottom: -0.5rem;
+/* Récit d'introduction : en tête de la colonne de la carte. */
+.intro {
+  min-width: 0;
 }
 
 /* Ordinateur : carte collante à gauche, jours à droite. */
@@ -108,15 +100,20 @@
     min-height: var(--parcours-min);
   }
 
-  .colCarte > .titreSection {
-    margin-bottom: 1rem;
-  }
-
   .colCarte {
     display: flex;
     flex-direction: column;
+    gap: 1.5rem;
     align-self: stretch;
     min-height: 0;
+  }
+
+  /* Un long récit défile dans sa zone ; la carte garde au moins 45 % de la
+     colonne (variante E). La liste des jours, elle, ne rétrécit pas. */
+  .intro {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: var(--jours-defilement);
   }
 
   .jours {
@@ -136,6 +133,7 @@
   .zoneCarte {
     top: var(--carte-haut);
     flex: var(--carte-flex);
+    min-height: var(--carte-hauteur-min);
     height: var(--carte-hauteur);
     max-height: var(--carte-hauteur-max);
     margin: 0 0 0 calc(-1 * var(--debord-carte));

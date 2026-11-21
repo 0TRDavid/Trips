@@ -57,7 +57,7 @@ html[data-largeur="serre"] {
   --debord-carte: 0px;
   --rayon-carte: var(--rayon);
   --ecart-colonnes: var(--marge);
-  --ecart-parcours: var(--marge);
+  --ecart-parcours: calc(var(--marge) * 0.4);
 }
 
 @media (min-width: 900px) {
@@ -71,6 +71,7 @@ html[data-largeur="serre"] {
     --parcours-min: 420px;
     --jours-defilement: auto;
     --carte-flex: 1;
+    --carte-hauteur-min: 45%;
     --carte-hauteur: auto;
     --carte-hauteur-max: none;
   }

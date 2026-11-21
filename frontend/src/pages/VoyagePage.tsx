@@ -51,20 +51,16 @@ export default function VoyagePage() {
     <article className={styles.page}>
       <EnteteVoyage voyage={voyage} />
 
-      {!isPlaceholderData && voyage.recit_intro_html.trim() && (
-        <Apparition className={styles.intro}>
-          <section>
-            <Recit html={voyage.recit_intro_html} />
-          </section>
-        </Apparition>
-      )}
-
       {!isPlaceholderData && (
       <Apparition className={styles.parcours}>
-        <section className={styles.colCarte} aria-labelledby="titre-carte">
-        <h2 id="titre-carte" className={styles.titreSection}>
-          Le parcours
-        </h2>
+        {/* Colonne de gauche : récit d'introduction (aligné sur « Jour après
+            jour »), puis la carte, qui prend la hauteur restante. */}
+        <div className={styles.colCarte}>
+        {voyage.recit_intro_html.trim() && (
+          <section className={styles.intro} aria-label="Introduction">
+            <Recit html={voyage.recit_intro_html} />
+          </section>
+        )}
         <div className={styles.zoneCarte}>
           {voyage.trace.length > 0 ? (
             <>
@@ -97,7 +93,7 @@ export default function VoyagePage() {
             <p className={styles.sansCarte}>Aucune photo géolocalisée pour ce voyage.</p>
           )}
         </div>
-        </section>
+        </div>
 
         <section className={styles.jours} aria-labelledby="titre-jours">
           <h2 id="titre-jours" className={styles.titreSection}>
