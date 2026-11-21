@@ -25,34 +25,23 @@
   --police-titre: "Fraunces Variable", Georgia, "Times New Roman", serif;
   --police-texte: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --marge: clamp(1rem, 4vw, 3rem);
-  --largeur-max: 1400px;
+  /* Pleine largeur (variante E du labo, validée le 21/11/2026) : le contenu
+     suit l'écran, avec une même petite marge partout ; seules les
+     couvertures touchent les bords (elles mangent la marge). */
+  --marge: clamp(0.75rem, 1.5vw, 1.5rem);
+  --largeur-max: none;
   --largeur-lecture: 38rem;
   --rayon: 6px;
   --hauteur-entete: 3.4rem;
-
-  /* Largeur des pages : variantes comparées au labo (styles/labo-largeur.css). */
-  --debord: 0px; /* les visuels (couvertures, carte) mangent la marge de côté */
-  --rayon-visuel: var(--rayon);
-  --debord-carte: var(--debord); /* la carte du voyage peut déborder autrement que les couvertures */
-  --rayon-carte: var(--rayon-visuel);
-  --carte-min: 320px; /* largeur mini d'une carte de voyage (accueil) */
+  --carte-min: 340px; /* largeur mini d'une carte de voyage (accueil) */
   --h-galerie-large: 320px; /* hauteur de rangée de la galerie, écran ≥ 1200 px */
-  --ecart-colonnes: clamp(2rem, 4vw, 4rem); /* entre la carte et les jours (ordinateur) */
-  --ecart-parcours: clamp(1.5rem, 4vw, 3rem); /* au-dessus de la carte */
-  --voyage-hauteur: auto; /* page voyage (ordinateur) : auto = elle défile */
-  --voyage-bas: 4rem;
-  --parcours-rangee: auto;
-  --parcours-flex: none;
-  --parcours-min: auto;
-  --jours-defilement: visible;
-  --carte-flex: none;
-  --carte-hauteur-min: auto;
-  --carte-haut: 1rem; /* carte du voyage collante (ordinateur) */
-  --carte-hauteur: calc(100vh - 2rem);
-  --carte-hauteur-max: 820px;
-  --jour-colonnes: minmax(0, 1fr); /* page jour : une colonne, ou récit à côté */
-  --jour-recit-colonne: auto;
-  --jour-suite-colonne: auto;
-  --jour-recit-position: static;
+}
+
+/* Très grands écrans : cartes de l'accueil et rangées de photos plus grandes
+   (GaleriePhotos.tsx : `sizes` suit). */
+@media (min-width: 1700px) {
+  :root {
+    --carte-min: 400px;
+    --h-galerie-large: 400px;
+  }
 }

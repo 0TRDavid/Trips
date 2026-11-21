@@ -75,25 +75,6 @@
 }
 
 
-.choix {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.option {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.5rem;
-  align-items: start;
-  font-size: 0.85rem;
-  color: var(--encre-2);
-  cursor: pointer;
-}
-
-.option strong {
-  color: var(--encre);
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;

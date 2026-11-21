@@ -8,7 +8,7 @@
   max-width: var(--largeur-max);
   width: 100%;
   margin: 0 auto;
-  padding: var(--ecart-parcours) var(--marge) 0;
+  padding: calc(var(--marge) * 0.4) var(--marge) 0;
   display: grid;
   gap: 1.5rem;
 }
@@ -65,14 +65,13 @@
   text-align: center;
 }
 
-/* « Le parcours » et « Jour après jour » : même titre de section. */
 .titreSection {
   font-size: clamp(1.6rem, 4vw, 2.2rem);
   margin-bottom: 1rem;
 }
 
 /* Téléphone : la colonne de la carte s'efface (display: contents), pour que
-   la carte reste collante dans le parcours ; son titre défile avec la page. */
+   la carte reste collante dans le parcours ; le récit défile avec la page. */
 .colCarte {
   display: contents;
 }
@@ -89,66 +88,62 @@
   max-width: none;
 }
 
-/* Ordinateur : carte collante à gauche, jours à droite. */
+/* Ordinateur : la page tient dans l'écran (couverture + parcours). Carte à
+   gauche, sous le récit d'introduction ; à droite, seule la liste des jours
+   défile, sous son titre. Sur un écran trop bas (parcours < 420 px), la page
+   défile un peu. */
 @media (min-width: 900px) {
-  /* Variante E : la page tient dans l'écran (--voyage-hauteur), le parcours
-     prend la hauteur restante et seule la liste des jours défile. Sinon
-     (hauteur auto), la page défile et la carte reste collante. */
   .page {
-    padding-bottom: var(--voyage-bas);
+    padding-bottom: var(--marge);
     display: flex;
     flex-direction: column;
-    height: var(--voyage-hauteur);
+    min-height: calc(100svh - var(--hauteur-entete));
   }
 
   .parcours {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-    grid-template-rows: var(--parcours-rangee);
-    gap: var(--ecart-colonnes);
-    align-items: start;
-    flex: var(--parcours-flex);
-    min-height: var(--parcours-min);
+    grid-template-rows: minmax(0, 1fr);
+    gap: var(--marge);
+    flex: 1 1 0;
+    min-height: 420px;
   }
 
   .colCarte {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    align-self: stretch;
     min-height: 0;
   }
 
   /* Un long récit défile dans sa zone ; la carte garde au moins 45 % de la
-     colonne (variante E). La liste des jours, elle, ne rétrécit pas. */
+     colonne. La liste des jours, elle, ne rétrécit pas. */
   .intro {
     margin-bottom: 0;
     flex: 0 1 auto;
     min-height: 0;
-    overflow-y: var(--jours-defilement);
+    overflow-y: auto;
   }
 
   .jours {
     display: flex;
     flex-direction: column;
-    align-self: stretch;
     min-height: 0;
   }
 
   .defilement {
     flex: 1;
     min-height: 0;
-    overflow-y: var(--jours-defilement);
+    overflow-y: auto;
     overscroll-behavior: contain;
   }
 
   .zoneCarte {
-    top: var(--carte-haut);
-    flex: var(--carte-flex);
-    min-height: var(--carte-hauteur-min);
-    height: var(--carte-hauteur);
-    max-height: var(--carte-hauteur-max);
-    margin: 0 0 0 calc(-1 * var(--debord-carte));
-    border-radius: var(--rayon-carte);
+    position: relative;
+    top: auto;
+    flex: 1;
+    min-height: 45%;
+    margin: 0;
+    border-radius: var(--rayon);
     overflow: hidden;
     box-shadow: none;
   }
