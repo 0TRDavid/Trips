@@ -19,7 +19,8 @@
 .visuel {
   height: 25vh;
   height: 25svh;
-  border-radius: var(--rayon);
+  /* Couverture d'un bord à l'autre de l'écran, sans coins arrondis. */
+  margin-inline: calc(-1 * var(--marge));
   overflow: hidden;
   background: var(--papier-2);
 }

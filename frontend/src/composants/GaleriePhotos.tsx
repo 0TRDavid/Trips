@@ -47,7 +47,7 @@ function Rangees({ slug, date, photos }: Props) {
       {photos.map((photo) => {
         const r = ratio(photo);
         // Largeur affichée ≈ ratio × hauteur de rangée (avec marge pour l'étirement).
-        const sizes = `(min-width: 1200px) ${Math.round(r * 320 * 1.5)}px, (min-width: 700px) ${Math.round(r * 260 * 1.5)}px, min(100vw, ${Math.round(r * 110 * 2)}px)`;
+        const sizes = `(min-width: 1700px) ${Math.round(r * 400 * 1.5)}px, (min-width: 1200px) ${Math.round(r * 320 * 1.5)}px, (min-width: 700px) ${Math.round(r * 260 * 1.5)}px, min(100vw, ${Math.round(r * 110 * 2)}px)`;
         const nature = photo.type === "video" ? "Vidéo" : "Photo";
         const alt = photo.legende || `${nature} du ${dateCourte(date)}${photo.prise_le ? ` à ${heureLocale(photo.prise_le)}` : ""}`;
         const image =

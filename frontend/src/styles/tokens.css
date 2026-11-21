@@ -25,9 +25,23 @@
   --police-titre: "Fraunces Variable", Georgia, "Times New Roman", serif;
   --police-texte: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  --marge: clamp(1rem, 4vw, 3rem);
-  --largeur-max: 1400px;
+  /* Pleine largeur (variante E du labo, validée le 21/11/2026) : le contenu
+     suit l'écran, avec une même petite marge partout ; seules les
+     couvertures touchent les bords (elles mangent la marge). */
+  --marge: clamp(0.75rem, 1.5vw, 1.5rem);
+  --largeur-max: none;
   --largeur-lecture: 38rem;
   --rayon: 6px;
   --hauteur-entete: 3.4rem;
+  --carte-min: 340px; /* largeur mini d'une carte de voyage (accueil) */
+  --h-galerie-large: 320px; /* hauteur de rangée de la galerie, écran ≥ 1200 px */
+}
+
+/* Très grands écrans : cartes de l'accueil et rangées de photos plus grandes
+   (GaleriePhotos.tsx : `sizes` suit). */
+@media (min-width: 1700px) {
+  :root {
+    --carte-min: 400px;
+    --h-galerie-large: 400px;
+  }
 }

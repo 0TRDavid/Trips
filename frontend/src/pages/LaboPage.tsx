@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useJour, useVoyage, useVoyages } from "../api/requetes";
 import { useTitre } from "../hooks/useTitre";
 import { chemins } from "../lib/chemins";
@@ -39,6 +39,14 @@ const NOMS: Record<NomTransition, string> = {
   page: "T4 · Vignette de la timeline → en-tête du jour",
 };
 
+/** Taille simulée du cadre « ordinateur ». */
+const ECRANS = [
+  { l: 1280, h: 800 },
+  { l: 1920, h: 1080 },
+  { l: 2560, h: 1440 },
+] as const;
+const LARGEUR_AFFICHEE = 900;
+
 export default function LaboPage() {
   useTitre("Labo des transitions");
   const { data: voyages } = useVoyages();
@@ -52,6 +60,8 @@ export default function LaboPage() {
 
   const [r, setR] = useState<Reglages>(() => reglages());
   const [enCours, setEnCours] = useState<string | null>(null);
+  const [ecran, setEcran] = useState(1);
+  const { l: ecranL, h: ecranH } = ECRANS[ecran];
   const tel = useRef<HTMLIFrameElement>(null);
   const pc = useRef<HTMLIFrameElement>(null);
   const reglagesCourants = useRef(r);
@@ -149,6 +159,19 @@ export default function LaboPage() {
           </button>
         </div>
 
+        {avecPc && (
+          <label className={styles.globaux}>
+            Écran ordinateur{" "}
+            <select value={ecran} onChange={(e) => setEcran(Number(e.target.value))}>
+              {ECRANS.map((e, i) => (
+                <option key={e.l} value={i}>
+                  {e.l} × {e.h}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         {(Object.keys(NOMS) as NomTransition[]).map((nom) => (
           <section key={nom} className={styles.transition} data-en-cours={enCours === nom || undefined}>
             <h2>{NOMS[nom]}</h2>
@@ -168,11 +191,22 @@ export default function LaboPage() {
           <figcaption>Téléphone · 390 × 844</figcaption>
         </figure>
         {avecPc && (
-          <figure className={styles.ecranPc}>
+          <figure
+            className={styles.ecranPc}
+            style={
+              {
+                "--ecran-l": `${ecranL}px`,
+                "--ecran-h": `${ecranH}px`,
+                "--echelle": LARGEUR_AFFICHEE / ecranL,
+              } as CSSProperties
+            }
+          >
             <div className={styles.cadrePc}>
               <iframe ref={pc} src="/" title="Site, format ordinateur" />
             </div>
-            <figcaption>Ordinateur · 1280 × 800 (réduit)</figcaption>
+            <figcaption>
+              Ordinateur · {ecranL} × {ecranH} (réduit)
+            </figcaption>
           </figure>
         )}
       </div>

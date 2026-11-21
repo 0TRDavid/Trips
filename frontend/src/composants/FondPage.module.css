@@ -3,7 +3,9 @@
   left: 0;
   right: 0;
   top: 0;
-  height: max(110svh, 760px);
+  /* Jamais plus haut que la page : une page qui tient dans l'écran (voyage,
+     variante E) ne doit pas défiler à cause du fond. */
+  height: min(max(110svh, 760px), 100%);
   z-index: -1;
   overflow: hidden;
   pointer-events: none;

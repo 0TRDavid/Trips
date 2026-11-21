@@ -49,7 +49,7 @@
 
 @media (min-width: 1200px) {
   .galerie {
-    --h: 320px;
+    --h: var(--h-galerie-large);
   }
 }
 
