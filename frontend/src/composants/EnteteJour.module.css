@@ -15,14 +15,25 @@
   color: var(--accent);
 }
 
-/* Même hauteur que l'en-tête du voyage : au plus un quart de l'écran. */
+/* Photo d'ouverture : grande, la journée commence par elle. */
 .visuel {
-  height: 25vh;
-  height: 25svh;
+  height: 70vh;
+  height: 70svh;
   /* Couverture d'un bord à l'autre de l'écran, sans coins arrondis. */
   margin-inline: calc(-1 * var(--marge));
   overflow: hidden;
   background: var(--papier-2);
+}
+
+@media (min-width: 900px) {
+  .visuel {
+    height: 78vh;
+    height: 78svh;
+  }
+}
+
+.parallaxe {
+  height: 100%;
 }
 
 .filet {

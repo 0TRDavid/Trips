@@ -1,47 +1,105 @@
-import type { CSSProperties } from "react";
+import { useMemo, useRef, type CSSProperties } from "react";
 import { Link } from "react-router";
-import type { PhotoJour } from "../api/types";
+import type { BlocRecit, PhotoJour } from "../api/types";
+import { useApparitionPhotos } from "../hooks/useApparitionPhotos";
+import { ContexteLecture, useNouveauChefDeLecture } from "../hooks/useLecture";
 import { chemins } from "../lib/chemins";
-import { dateCourte, heureLocale, libelleHeure, momentsParHeure } from "../lib/dates";
+import { dateCourte, heureLocale, libelleHeure } from "../lib/dates";
+import { reglages, type VarianteCollant } from "../lib/mouvement";
+import { bornesHeures, entremeler } from "../lib/recit";
 import { ratio } from "../lib/rendus";
 import { idPhoto } from "../lib/transitions";
 import { aUneVideo, formatDuree } from "../lib/videos";
+import BandeauHeure from "./BandeauHeure";
 import Photo from "./Photo";
 import PhotoAnimee from "./PhotoAnimee";
+import ProgressionJour from "./ProgressionJour";
+import Recit from "./Recit";
 import styles from "./GaleriePhotos.module.css";
 
-type Props = { slug: string; date: string; photos: PhotoJour[] };
+type Props = {
+  slug: string;
+  date: string;
+  photos: PhotoJour[];
+  /** Récit découpé aux marqueurs `[[14h]]` (API : recit_blocs). */
+  blocs: BlocRecit[];
+  /** Visionneuse ouverte : les photos animées de la page se taisent. */
+  suspendu: boolean;
+};
 
 /**
+ * La journée, racontée au fil du défilement : photos regroupées par heure
+ * (« 10 h », « 14 h »…), récit intercalé là où l'auteur l'a placé
+ * (lib/recit.ts), intitulé d'heure collant avec la progression de la journée.
+ *
  * Galerie en rangées justifiées, en CSS pur : chaque photo s'étire en
  * proportion de son ratio (flex-grow = largeur / hauteur), donc toutes les
  * photos d'une rangée ont la même hauteur et aucune n'est rognée. Les
  * dimensions viennent de l'API : la mise en page est juste avant le
- * chargement des images.
+ * chargement des images. L'ordre est celui de l'API (heure de prise, sauf
+ * retouche dans l'admin).
  *
- * Les photos sont regroupées par heure (« 10 h », « 14 h »…) pour suivre la
- * journée : chaque moment a son intitulé et ses propres rangées. L'ordre est
- * celui de l'API (heure de prise, sauf retouche dans l'admin).
+ * Vie de la page, toujours jouée par le navigateur :
+ * - photos et blocs du récit apparaissent une fois à leur entrée dans l'écran
+ *   (hooks/useApparitionPhotos.ts) ;
+ * - une seule photo animée joue, la plus proche du centre (lib/lecture.ts) ;
+ * - le filet de l'intitulé collant se remplit avec le défilement.
  */
-export default function GaleriePhotos({ slug, date, photos }: Props) {
+export default function GaleriePhotos({ slug, date, photos, blocs, suspendu }: Props) {
+  const racine = useRef<HTMLDivElement>(null);
+  const elements = useMemo(() => entremeler(photos, blocs), [photos, blocs]);
+  const bornes = useMemo(() => bornesHeures(photos), [photos]);
+  const collant: VarianteCollant = reglages().collant;
+  const chef = useNouveauChefDeLecture(suspendu);
+  useApparitionPhotos(racine, true);
+  let numero = 0;
+
   return (
-    <div className={styles.moments}>
-      {momentsParHeure(photos).map((moment, i) => {
-        const idTitre = `moment-${i}`;
-        return (
-          <section key={`${i}-${moment.heure}`} className={styles.moment} aria-labelledby={idTitre}>
-            <h2 id={idTitre} className={styles.heure}>
-              {libelleHeure(moment.heure)}
-            </h2>
-            <Rangees slug={slug} date={date} photos={moment.photos} />
-          </section>
-        );
-      })}
+    <ContexteLecture.Provider value={chef}>
+      <div ref={racine} className={styles.journee} data-collant={collant}>
+        {collant === "bandeau" && bornes && <BandeauHeure racine={racine} bornes={bornes} />}
+        {elements.map((element, i) => {
+          if (element.genre === "recit") {
+            return <BlocDuRecit key={`r${i}`} html={element.html} />;
+          }
+          const idTitre = `moment-${numero++}`;
+          return (
+            <section
+              key={`m${i}-${element.heure}`}
+              className={styles.moment}
+              aria-labelledby={idTitre}
+              data-heure={element.heure ?? ""}
+            >
+              <h2 id={idTitre} className={styles.heure}>
+                <span className={styles.libelle}>{libelleHeure(element.heure)}</span>
+                {collant === "pousse" && bornes && <ProgressionJour racine={racine} fin={bornes[1]} />}
+              </h2>
+              {element.segments.map((segment, j) =>
+                segment.genre === "recit" ? (
+                  <BlocDuRecit key={`r${j}`} html={segment.html} />
+                ) : (
+                  <Rangees key={`p${j}`} slug={slug} date={date} photos={segment.photos} />
+                ),
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </ContexteLecture.Provider>
+  );
+}
+
+function BlocDuRecit({ html }: { html: string }) {
+  return (
+    <div className={styles.recit} data-apparition="">
+      <Recit html={html} />
     </div>
   );
 }
 
-function Rangees({ slug, date, photos }: Props) {
+type PropsRangees = { slug: string; date: string; photos: PhotoJour[] };
+
+function Rangees({ slug, date, photos }: PropsRangees) {
   return (
     <ul className={styles.galerie}>
       {photos.map((photo) => {
@@ -57,7 +115,7 @@ function Rangees({ slug, date, photos }: Props) {
             <Photo photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} />
           );
         return (
-          <li key={photo.id} className={styles.cellule} style={{ "--ratio": r } as CSSProperties}>
+          <li key={photo.id} className={styles.cellule} style={{ "--ratio": r } as CSSProperties} data-apparition="">
             <Link
               to={chemins.photo(slug, date, photo.id)}
               // La page jour reste en place derrière la visionneuse.

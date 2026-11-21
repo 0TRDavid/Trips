@@ -63,6 +63,10 @@
   z-index: 1;
   background: var(--papier);
   color: var(--encre);
+  /* Couleurs dérivées recalculées ICI, où la palette de la page est posée :
+     déclarées sur :root, elles y sont figées avec l'accent par défaut. */
+  --filet: color-mix(in oklch, var(--accent-vif) 22%, var(--papier-2));
+  --accent-doux: color-mix(in oklch, var(--accent-vif) 40%, var(--papier));
 }
 
 .evitement {

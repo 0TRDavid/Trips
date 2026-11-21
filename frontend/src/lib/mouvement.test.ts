@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GenreNavigation, Navigation } from "./mouvement";
 import {
   REGLAGES_DEFAUT,
+  apparitionPhoto,
+  ouvertureAuDefilement,
+  roulementHeure,
   enregistrerReglages,
   entree,
   sortie,
@@ -193,5 +196,40 @@ describe("trajectoire précalculée du vol", () => {
     expect(avancements[0]).toBe(0);
     expect(avancements.at(-1)).toBeCloseTo(1);
     expect(avancements[3]).toBeGreaterThan(3 / avancements.length); // expo-out : rapide au début
+  });
+});
+
+describe("page jour : défilement", () => {
+  it("une apparition finit sans transform, garde son état de départ pendant le délai, et son décalage est plafonné", () => {
+    for (const v of ["fondu", "montee", "cascade"] as const) {
+      const a = apparitionPhoto(v, false, 3)!;
+      const fin = a.images.at(-1)!;
+      expect(fin.opacity).toBe(1);
+      expect(fin.transform ?? "none").toBe("none");
+      expect(a.options.fill).toBe("backwards");
+      expect(apparitionPhoto(v, false, 50)!.options.delay).toBe(apparitionPhoto(v, false, 6)!.options.delay);
+    }
+    expect(apparitionPhoto("aucune", false, 0)).toBeNull();
+  });
+
+  it("mouvement réduit : un fondu, sans déplacement ni délai", () => {
+    const a = apparitionPhoto("cascade", true, 4)!;
+    expect(a.images.some((i) => "transform" in i)).toBe(false);
+    expect(a.options.delay).toBe(0);
+    const r = roulementHeure(1, true);
+    expect([...r.entree.images, ...r.sortie.images].some((i) => "transform" in i)).toBe(false);
+  });
+
+  it("le roulement d'heure : entrée finie sans transform, sortie plus courte, sens respecté", () => {
+    const bas = roulementHeure(1, false);
+    const haut = roulementHeure(-1, false);
+    expect(bas.entree.images.at(-1)!.transform).toBe("none");
+    expect(Number(bas.sortie.options.duration)).toBeLessThan(Number(bas.entree.options.duration));
+    expect(bas.entree.images[0].transform).not.toBe(haut.entree.images[0].transform);
+  });
+
+  it("la photo d'ouverture n'anime que transform et opacity", () => {
+    expect(Object.keys(ouvertureAuDefilement("efface")).sort()).toEqual(["opacity", "transform"]);
+    expect(Object.keys(ouvertureAuDefilement("decale"))).toEqual(["transform"]);
   });
 });

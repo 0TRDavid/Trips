@@ -60,14 +60,37 @@ export function publierDureesCss(racine: HTMLElement = document.documentElement)
 // miniature ↔ plein écran, page entière entre deux jours, fond en halos fixes.
 // Les autres ont été retirées ; le labo sert à rejouer et à ralentir.
 
+/** Page jour (étape 6b) : variantes comparées au labo. */
+export const VARIANTES_APPARITION = ["aucune", "fondu", "montee", "cascade"] as const;
+export const VARIANTES_COLLANT = ["pousse", "bandeau"] as const;
+export const VARIANTES_OUVERTURE = ["efface", "decale"] as const;
+export type VarianteApparition = (typeof VARIANTES_APPARITION)[number];
+export type VarianteCollant = (typeof VARIANTES_COLLANT)[number];
+export type VarianteOuverture = (typeof VARIANTES_OUVERTURE)[number];
+
 export type Reglages = {
   /** Multiplicateur des durées (1 = normal, 4 = quatre fois plus lent). */
   ralenti: number;
   /** Simule `prefers-reduced-motion: reduce`. */
   reduit: boolean;
+  /** Apparition des photos à leur entrée dans l'écran. */
+  apparition: VarianteApparition;
+  /** Intitulé d'heure collant : chaque intitulé poussé par le suivant, ou un bandeau unique. */
+  collant: VarianteCollant;
+  /** Photo d'ouverture au défilement : s'efface en se décalant, ou se décale seulement. */
+  ouverture: VarianteOuverture;
 };
 
-export const REGLAGES_DEFAUT: Reglages = { ralenti: 1, reduit: false };
+export const REGLAGES_DEFAUT: Reglages = {
+  ralenti: 1,
+  reduit: false,
+  apparition: "montee",
+  collant: "pousse",
+  ouverture: "efface",
+};
+
+const choix = <T extends string>(valeurs: readonly T[], lu: unknown, defaut: T): T =>
+  valeurs.includes(lu as T) ? (lu as T) : defaut;
 
 export const CLE_REGLAGES = "carnet-labo";
 export const EVENEMENT_REGLAGES = "carnet-reglages";
@@ -82,6 +105,9 @@ function lireReglages(): Reglages {
     return {
       ralenti: typeof lu.ralenti === "number" && lu.ralenti > 0 ? lu.ralenti : 1,
       reduit: lu.reduit === true,
+      apparition: choix(VARIANTES_APPARITION, lu.apparition, REGLAGES_DEFAUT.apparition),
+      collant: choix(VARIANTES_COLLANT, lu.collant, REGLAGES_DEFAUT.collant),
+      ouverture: choix(VARIANTES_OUVERTURE, lu.ouverture, REGLAGES_DEFAUT.ouverture),
     };
   } catch {
     return REGLAGES_DEFAUT;
@@ -277,4 +303,91 @@ export function transitionFondVisionneuse(sens: Sens, reduit: boolean): Transiti
   if (reduit) return fondu();
   const vol = dureeDe(volPhoto(sens));
   return sens === 1 ? { duration: vol * 0.6, ease: "linear" } : { duration: vol * 0.8, ease: "linear" };
+}
+
+// --- Page jour : défilement (étape 6b) -------------------------------------------
+// Animations jouées par le navigateur (element.animate, ou Motion `scroll()`
+// branché sur une ViewTimeline native) : rien n'est calculé à chaque image
+// sur le fil principal.
+
+/** Réglages du défilement de la page jour. */
+export const defilement = {
+  /** Photo d'ouverture : décalage (en % de sa hauteur) et opacité quand elle a quitté l'écran. */
+  ouverture: { decalage: 25, opaciteFin: 0.4 },
+  /** Apparition des photos : distance (px), décalage entre deux photos d'un même lot (s), plafond du décalage. */
+  apparition: { montee: 12, cascade: 28, intervalle: 0.04, intervalleCascade: 0.07, maxDecales: 6 },
+  /** Roulement de l'heure dans le bandeau (fraction de la hauteur du libellé). */
+  roulement: 0.6,
+  /** Photo animée : temps (s) pendant lequel elle doit rester la plus proche du
+   *  centre avant de jouer (on ne télécharge pas les vidéos survolées). */
+  election: 0.2,
+} as const;
+
+export type AnimationNative = { images: Keyframe[]; options: KeyframeAnimationOptions };
+
+/**
+ * Apparition d'une photo (ou d'un bloc du récit) à son entrée dans l'écran,
+ * pour `element.animate()`. `rang` : position dans le lot de photos entrées
+ * ensemble (décalage plafonné). Null : aucune animation.
+ * `fill: "backwards"` tient l'état de départ pendant le délai ; à la fin,
+ * l'animation disparaît et l'élément retrouve son style (aucun transform).
+ */
+export function apparitionPhoto(variante: VarianteApparition, reduit: boolean, rang: number): AnimationNative | null {
+  if (variante === "aucune") return null;
+  const a = defilement.apparition;
+  if (reduit || variante === "fondu") {
+    const d = reduit ? DUREE_REDUITE : duree.normale;
+    return {
+      images: [{ opacity: 0 }, { opacity: 1 }],
+      options: { duration: t(d) * 1000, delay: reduit ? 0 : t(Math.min(rang, a.maxDecales) * a.intervalle) * 1000, easing: "linear", fill: "backwards" },
+    };
+  }
+  const cascade = variante === "cascade";
+  const dy = cascade ? a.cascade : a.montee;
+  const pas = cascade ? a.intervalleCascade : a.intervalle;
+  return {
+    images: [
+      { opacity: 0, transform: `translate(0px, ${dy}px)` },
+      { opacity: 1, transform: "none" },
+    ],
+    options: {
+      duration: t(cascade ? duree.lente : duree.normale) * 1000,
+      delay: t(Math.min(rang, a.maxDecales) * pas) * 1000,
+      easing: cssBezier(courbe.entree),
+      fill: "backwards",
+    },
+  };
+}
+
+/** Changement d'heure dans le bandeau : `sens` 1 = on descend dans la journée. */
+export function roulementHeure(sens: Sens, reduit: boolean): { entree: AnimationNative; sortie: AnimationNative } {
+  if (reduit) {
+    const f = { duration: t(DUREE_REDUITE) * 1000, easing: "linear" };
+    return {
+      entree: { images: [{ opacity: 0 }, { opacity: 1 }], options: f },
+      sortie: { images: [{ opacity: 1 }, { opacity: 0 }], options: { ...f, fill: "forwards" } },
+    };
+  }
+  const h = defilement.roulement * 100 * sens;
+  return {
+    entree: {
+      images: [{ opacity: 0, transform: `translate(0px, ${h}%)` }, { opacity: 1, transform: "none" }],
+      options: { duration: t(duree.normale) * 1000, easing: cssBezier(courbe.entree) },
+    },
+    sortie: {
+      images: [{ opacity: 1, transform: "translate(0px, 0%)" }, { opacity: 0, transform: `translate(0px, ${-h}%)` }],
+      options: { duration: t(duree.normale * facteurSortie) * 1000, easing: cssBezier(courbe.sortie), fill: "forwards" },
+    },
+  };
+}
+
+/** Photo d'ouverture, liée au défilement (de « en haut de l'écran » à « sortie de l'écran »). */
+export function ouvertureAuDefilement(variante: VarianteOuverture): Record<string, string[] | number[]> {
+  const o = defilement.ouverture;
+  const decalage = { transform: ["translate(0px, 0%)", `translate(0px, ${o.decalage}%)`] };
+  return variante === "efface" ? { ...decalage, opacity: [1, o.opaciteFin] } : decalage;
+}
+
+function cssBezier(c: readonly [number, number, number, number]): string {
+  return `cubic-bezier(${c.join(", ")})`;
 }

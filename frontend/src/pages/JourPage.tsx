@@ -37,13 +37,22 @@ export default function JourPage() {
           cliquable ni atteignable au clavier, mais reste affichée et montée. */}
       <article className={styles.page} inert={visionneuse !== null}>
         <EnteteJour jour={jour} />
-        <Recit html={jour.recit_html} className={styles.recit} />
         {galerieAutorisee && (
           <Apparition className={styles.suite}>
             {jour.photos.length > 0 ? (
-              <GaleriePhotos slug={slug} date={jour.date} photos={jour.photos} />
+              // Le récit est dans la galerie, intercalé entre les heures (marqueurs [[14h]]).
+              <GaleriePhotos
+                slug={slug}
+                date={jour.date}
+                photos={jour.photos}
+                blocs={jour.recit_blocs}
+                suspendu={visionneuse !== null}
+              />
             ) : (
-              <p className={styles.vide}>Aucune photo visible pour ce jour.</p>
+              <>
+                <Recit html={jour.recit_html} />
+                <p className={styles.vide}>Aucune photo visible pour ce jour.</p>
+              </>
             )}
             <NavJours slug={slug} precedent={jour.precedent} suivant={jour.suivant} />
           </Apparition>

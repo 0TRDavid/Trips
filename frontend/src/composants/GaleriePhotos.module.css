@@ -1,4 +1,4 @@
-.moments {
+.journee {
   display: grid;
   gap: clamp(1.25rem, 3vw, 2.25rem);
 }
@@ -8,24 +8,97 @@
   gap: 0.6rem;
 }
 
-/* Intitulé d'heure : petit, discret, prolongé par un filet. */
+/* Intitulé d'heure : petit, discret, prolongé par un filet qui se remplit
+   avec la progression de la journée (ProgressionJour). Variante « pousse » :
+   il colle en haut de l'écran tant qu'on parcourt ses photos, puis l'heure
+   suivante le pousse (sticky dans sa section, sans JavaScript). */
 .heure {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin: 0;
+  margin: 0 calc(-1 * var(--marge));
+  padding: 0.55rem var(--marge);
   font-family: var(--police-titre);
   font-size: clamp(1rem, 1.6vw, 1.2rem);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--encre-2);
+  /* srgb : en oklch, le mélange avec transparent perd la teinte (fond rosé). */
+  background: color-mix(in srgb, var(--papier) 86%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
-.heure::after {
+/* Variante « bandeau » : un seul bandeau collant (BandeauHeure) ; les
+   intitulés des moments restent dans le flux, sans fond. */
+.journee[data-collant="bandeau"] .moment > .heure {
+  position: static;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  padding-block: 0;
+}
+
+.journee[data-collant="bandeau"] .moment > .heure::after {
   content: "";
   flex: 1;
   height: 1px;
   background: var(--filet);
+}
+
+/* Libellés empilés dans la même case : l'heure qui part et celle qui arrive. */
+.libelles {
+  display: inline-grid;
+  overflow: clip;
+}
+
+.libelles > * {
+  grid-area: 1 / 1;
+}
+
+.libelle {
+  white-space: nowrap;
+}
+
+.sortant {
+  pointer-events: none;
+}
+
+.filet {
+  position: relative;
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  overflow: hidden;
+  background: var(--filet);
+}
+
+.rempli {
+  position: absolute;
+  inset: 0;
+  background: var(--accent-vif);
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+
+.fin {
+  font-family: var(--police-texte);
+  font-size: 0.8rem;
+  color: var(--encre-3);
+}
+
+/* Récit intercalé entre les moments (ou au milieu d'une heure). */
+.recit {
+  max-width: var(--largeur-lecture);
+  margin-block: 0.5rem 0.75rem;
+}
+
+/* Sous l'écran, en attendant d'y entrer (hooks/useApparitionPhotos.ts). */
+[data-apparition="attente"] {
+  opacity: 0;
 }
 
 .galerie {

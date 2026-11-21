@@ -8,10 +8,6 @@
   align-content: start;
 }
 
-.recit {
-  margin-top: -0.5rem;
-}
-
 /* Galerie et jours voisins : même espacement que les blocs de la page. */
 .suite {
   min-width: 0;
