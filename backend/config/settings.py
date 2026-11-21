@@ -100,6 +100,9 @@ REST_FRAMEWORK = {
 NEXTCLOUD_URL = os.environ.get("NEXTCLOUD_URL", "").rstrip("/")
 NEXTCLOUD_USER = os.environ.get("NEXTCLOUD_USER", "")
 NEXTCLOUD_PASSWORD = os.environ.get("NEXTCLOUD_PASSWORD", "")
+# Seul dossier Nextcloud où le site peut écrire (sidecars XMP, futurs exports) ;
+# jamais un dossier de voyage.
+NEXTCLOUD_DOSSIER_EXPORT = os.environ.get("NEXTCLOUD_DOSSIER_EXPORT", "")
 
 # Recherche de lieux (Nominatim) : contact facultatif ajouté au User-Agent.
 NOMINATIM_CONTACT = os.environ.get("NOMINATIM_CONTACT", "")

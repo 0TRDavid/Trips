@@ -124,6 +124,9 @@ class Photo(models.Model):
     # Idem pour les rendus vidéo (photo animée, vidéo) : les deux pistes se
     # régénèrent indépendamment.
     videos_etag = models.CharField("etag des rendus vidéo", max_length=200, blank=True)
+    # Empreinte (chemin + contenu) du sidecar XMP écrit dans le dossier d'export
+    # pour les valeurs saisies à la main ; vide : rien d'écrit.
+    xmp_empreinte = models.CharField("empreinte du XMP exporté", max_length=64, blank=True)
 
     class Meta:
         ordering = ["jour", "ordre", "prise_le"]
