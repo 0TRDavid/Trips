@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 from django.conf import settings
 from rest_framework import serializers
 
-from .markdown import rendre_markdown
+from .markdown import decouper_recit, recit_sans_marqueurs, rendre_markdown
 from .models import Jour, Photo, Voyage
 from .palette import palette
 from .rendus import TAILLES
@@ -194,6 +194,7 @@ class JourDetailSerializer(serializers.ModelSerializer):
 
     voyage = serializers.SerializerMethodField()
     recit_html = serializers.SerializerMethodField()
+    recit_blocs = serializers.SerializerMethodField()
     photos = serializers.SerializerMethodField()
     precedent = serializers.SerializerMethodField()
     suivant = serializers.SerializerMethodField()
@@ -201,7 +202,7 @@ class JourDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Jour
         fields = [
-            "date", "titre", "lieu", "recit", "recit_html", "voyage", "photos", "precedent", "suivant", "palette",
+            "date", "titre", "lieu", "recit", "recit_html", "recit_blocs", "voyage", "photos", "precedent", "suivant", "palette",
         ]
 
     palette = serializers.SerializerMethodField()
@@ -214,7 +215,11 @@ class JourDetailSerializer(serializers.ModelSerializer):
         return {"slug": v.slug, "titre": v.titre, "fuseau_horaire": v.fuseau_horaire}
 
     def get_recit_html(self, jour):
-        return rendre_markdown(jour.recit)
+        return recit_sans_marqueurs(jour.recit)
+
+    def get_recit_blocs(self, jour):
+        """Récit découpé aux marqueurs `[[14h]]` : placé entre les photos par le front."""
+        return decouper_recit(jour.recit)
 
     def get_photos(self, jour):
         return PhotoDuJourSerializer(self.context["photos_du_jour"], many=True, context=self.context).data

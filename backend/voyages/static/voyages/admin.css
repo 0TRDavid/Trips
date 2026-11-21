@@ -122,3 +122,16 @@ fieldset.sortable table tr.form-row.has_original td.original p {
 
 /* Jours en ligne dans la page d'un voyage : le libellé « Japon 2025 — 2025-06-01 » est redondant. */
 #jours-group td.original p { display: none; }
+
+/* Aperçu du récit : marqueur [[14h]] (texte placé avant le moment de 14 h). */
+.editor-preview .carnet-marqueur,
+.editor-preview-side .carnet-marqueur {
+  display: inline-block;
+  margin: 1em 0 0.25em;
+  padding: 0.1em 0.6em;
+  border-radius: 999px;
+  background: #ece7df;
+  color: #5d5850;
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}

@@ -35,7 +35,7 @@ from django.utils.http import urlencode
 
 from . import admin_completion
 from .generation import cle_rendus
-from .markdown import rendre_markdown
+from .markdown import apercu_recit
 from .models import Jour, Photo, Voyage
 from .widgets import ChoixCouverture, EditeurMarkdown, url_miniature
 
@@ -295,7 +295,7 @@ class VoyageAdmin(admin.ModelAdmin):
         """POST texte → {"html": …} : l'aperçu de l'éditeur, rendu comme sur le site."""
         if request.method != "POST":
             return HttpResponseNotAllowed(["POST"])
-        return JsonResponse({"html": rendre_markdown(request.POST.get("texte", ""))})
+        return JsonResponse({"html": apercu_recit(request.POST.get("texte", ""))})
 
     @admin.display(description="récits écrits")
     def jours_a_ecrire(self, voyage):
