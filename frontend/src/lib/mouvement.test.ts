@@ -9,7 +9,7 @@ import {
   variantesPage,
   variantesPhotoVoisine,
   volPhoto,
-  volVoyage,
+  volEnTete,
 } from "./mouvement";
 import { ecranDe, genreNavigation, navigation, sensNavigation } from "./navigation";
 import { echantillonner, echelleCouverture, etatVol } from "./vol";
@@ -54,7 +54,9 @@ describe("sens et genre de navigation", () => {
   it("genres : voyage entre l'accueil et un voyage, page sinon", () => {
     expect(genreNavigation("/", voyage)).toBe("voyage");
     expect(genreNavigation(voyage, "/")).toBe("voyage");
-    expect(genreNavigation(voyage, j1)).toBe("page");
+    expect(genreNavigation(voyage, j1)).toBe("ouvrirJour");
+    expect(genreNavigation(j1, voyage)).toBe("ouvrirJour");
+    expect(genreNavigation("/voyages/autre", j1)).toBe("page");
     expect(genreNavigation("/voyages/a/jours/2025-06-01", "/voyages/b/jours/2025-06-02")).toBe("page");
   });
 
@@ -68,7 +70,7 @@ describe("règles du système de mouvement", () => {
   // Seulement transform et opacity, écrits tels quels : x / y / scale de Motion
   // seraient calculés sur le fil principal et saccaderaient.
   const PERMISES = new Set(["opacity", "transform", "transition", "transitionEnd"]);
-  const genres: GenreNavigation[] = ["aucune", "fondu", "voyage", "jour", "page"];
+  const genres: GenreNavigation[] = ["aucune", "fondu", "voyage", "ouvrirJour", "jour", "page"];
   const resoudre = (v: unknown, custom: unknown) => (typeof v === "function" ? v(custom) : v) as Record<string, unknown>;
 
   it("n'anime que transform (translate / scale) et opacity, accélérables par le navigateur", () => {
@@ -98,7 +100,7 @@ describe("règles du système de mouvement", () => {
     }
     {
       const duree = (t: { visualDuration?: number; duration?: number }) => t.visualDuration ?? t.duration ?? 0;
-      expect(duree(volVoyage(-1))).toBeLessThan(duree(volVoyage(1)));
+      expect(duree(volEnTete(-1))).toBeLessThan(duree(volEnTete(1)));
       expect(duree(volPhoto(-1))).toBeLessThan(duree(volPhoto(1)));
       for (const sens of [1, -1] as const) {
         const nav = { genre: "page", sens } satisfies Navigation;
@@ -176,7 +178,7 @@ describe("vol d'un élément partagé", () => {
 
 describe("trajectoire précalculée du vol", () => {
   it("un ressort part de 0, finit exactement à 1, avec un léger dépassement", () => {
-    const { avancements, duree } = echantillonner(volVoyage(1));
+    const { avancements, duree } = echantillonner(volEnTete(1));
     expect(avancements[0]).toBe(0);
     expect(avancements.at(-1)).toBe(1);
     expect(Math.max(...avancements)).toBeGreaterThan(1); // rebond (bounce 0,12)

@@ -12,6 +12,12 @@
   margin-top: -0.5rem;
 }
 
+/* Galerie et jours voisins : même espacement que les blocs de la page. */
+.suite {
+  display: grid;
+  gap: clamp(1.75rem, 4vw, 3rem);
+}
+
 .vide {
   color: var(--encre-2);
 }

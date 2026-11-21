@@ -3,7 +3,7 @@ import type { VoyageDetail } from "../api/types";
 import { useVolEntrant } from "../hooks/useVolEntrant";
 import { useNavigationPage } from "../layout/contexte";
 import { periode, pluriel } from "../lib/dates";
-import { volVoyage } from "../lib/mouvement";
+import { volEnTete } from "../lib/mouvement";
 import { idVoyage } from "../lib/transitions";
 import Photo from "./Photo";
 import styles from "./EnteteVoyage.module.css";
@@ -19,7 +19,7 @@ export default function EnteteVoyage({ voyage }: { voyage: VoyageDetail }) {
     idVoyage(voyage.slug),
     () => visuel.current,
     () =>
-      nav.genre === "voyage" && nav.sens === 1 ? { transition: volVoyage(1) } : null,
+      nav.genre === "voyage" && nav.sens === 1 ? { transition: volEnTete(1) } : null,
   );
 
   return (

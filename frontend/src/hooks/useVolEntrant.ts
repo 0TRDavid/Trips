@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { lancerVol, trouverSource } from "../lib/vol";
+import { lancerVol, selecteurTransition, trouverSource } from "../lib/vol";
 import type { Transition } from "motion/react";
 
 type Vol = { transition: Transition };
@@ -19,6 +19,9 @@ export function useVolEntrant(id: string, cible: () => HTMLElement | null, vol: 
     const el = cible();
     const options = el ? vol() : null;
     if (!el || !options) return;
+    // Rien à faire si l'écran qu'on quitte n'a pas d'élément de même
+    // identifiant (sinon chaque vignette d'une liste clignoterait une image).
+    if (document.querySelectorAll(selecteurTransition(id)).length < 2) return;
     el.style.opacity = "0";
     const image = requestAnimationFrame(() => {
       el.style.opacity = "";

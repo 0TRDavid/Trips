@@ -8,11 +8,27 @@
   text-decoration: none;
   color: var(--encre-2);
   font-size: 0.95rem;
-  margin-bottom: clamp(1rem, 3vw, 2rem);
+  margin-bottom: clamp(0.5rem, 2vw, 1.25rem);
 }
 
 .retour:hover {
   color: var(--accent);
+}
+
+/* Même hauteur que l'en-tête du voyage : au plus un quart de l'écran. */
+.visuel {
+  height: 25vh;
+  height: 25svh;
+  border-radius: var(--rayon);
+  overflow: hidden;
+  background: var(--papier-2);
+}
+
+.filet {
+  height: 4px;
+  margin: -0.15rem 0 0.6rem;
+  border-radius: 2px;
+  background: var(--degrade);
 }
 
 .date {

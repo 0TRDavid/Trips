@@ -155,10 +155,14 @@ export function dureeDe(transition: Transition): number {
  * - aucune : premier affichage, ou geste « retour » déjà animé par le navigateur ;
  * - fondu : « réduire les animations » ;
  * - voyage : accueil ↔ voyage (élément partagé carte ↔ en-tête) ;
+ * - ouvrirJour : voyage ↔ un de ses jours (vignette de la timeline ↔ en-tête du jour) ;
  * - jour : jour ↔ jour du même voyage (glissement directionnel) ;
  * - page : tout le reste.
  */
-export type GenreNavigation = "aucune" | "fondu" | "voyage" | "jour" | "page";
+export type GenreNavigation = "aucune" | "fondu" | "voyage" | "ouvrirJour" | "jour" | "page";
+
+/** Navigation pendant laquelle une photo vole jusqu'à un en-tête (ou en revient). */
+export const avecEnTetePartage = (nav: Navigation) => nav.genre === "voyage" || nav.genre === "ouvrirJour";
 export type Sens = 1 | -1;
 export type Navigation = { genre: GenreNavigation; sens: Sens };
 
@@ -190,7 +194,7 @@ export const variantesPage: Variants = {
     if (genre === "aucune") return { opacity: 1 };
     if (genre === "fondu") return { opacity: 0 };
     if (genre === "jour") return { opacity: 1, transform: decaler(100 * sens) };
-    if (genre === "voyage") return { opacity: 0 };
+    if (genre === "voyage" || genre === "ouvrirJour") return { opacity: 0 };
     return { opacity: 0, transform: decaler(0, distance.montee * sens) };
   },
   visible: (nav: Navigation) => {
@@ -199,7 +203,7 @@ export const variantesPage: Variants = {
     if (genre === "aucune") return { ...fin, transition: AUCUNE };
     if (genre === "fondu") return { ...fin, transition: fondu() };
     if (genre === "jour") return { ...fin, transition: entree(duree.lente) };
-    if (genre === "voyage") {
+    if (genre === "voyage" || genre === "ouvrirJour") {
       // La page arrive vite ; ses blocs (<Apparition>) suivent en cascade.
       return {
         ...fin,
@@ -222,7 +226,7 @@ export const variantesPage: Variants = {
       // nouvelle n'arrive, mais en décélérant pour ne pas sembler « tomber ».
       return { transform: decaler(-100 * sens), transition: { ...sortie(duree.lente), ease: courbe.entree } };
     }
-    if (genre === "voyage") return { opacity: 0, transition: sortie(duree.rapide) };
+    if (genre === "voyage" || genre === "ouvrirJour") return { opacity: 0, transition: sortie(duree.rapide) };
     return { opacity: 0, transform: decaler(0, (-distance.montee / 2) * sens), transition: sortie(duree.normale) };
   },
 };
@@ -238,8 +242,8 @@ export function variantesBloc(reduit: boolean): Variants {
 
 // --- Éléments partagés (lib/vol.ts) ----------------------------------------------
 
-/** Vol carte ↔ en-tête du voyage. `sens` 1 : vers l'en-tête ; -1 : retour à la carte. */
-export function volVoyage(sens: Sens): Transition {
+/** Vol d'une vignette vers un en-tête (carte → voyage, timeline → jour). `sens` 1 : vers l'en-tête ; -1 : retour. */
+export function volEnTete(sens: Sens): Transition {
   return ressortDe("partage", sens === -1 ? facteurSortie : 1);
 }
 
