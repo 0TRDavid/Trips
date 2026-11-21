@@ -296,6 +296,10 @@ class EcranCompletionTests(TestCase):
         )
         self.admin = get_user_model().objects.create_superuser("admin", password="x")
         self.client.force_login(self.admin)
+        # Jamais de vrai processus d'export XMP depuis les tests (il viserait la vraie base).
+        patch = mock.patch("voyages.admin_completion.subprocess.Popen")
+        self.popen = patch.start()
+        self.addCleanup(patch.stop)
 
     def poster(self, client=None, **donnees):
         client = client or self.client
@@ -359,6 +363,8 @@ class EcranCompletionTests(TestCase):
     def test_appliquer_date_heure_locale(self):
         reponse = self.poster(ids=[self.wa.pk], action="date", instant="2025-06-01T10:30:00")
         self.assertEqual(reponse.status_code, 200)
+        commande = self.popen.call_args.args[0]
+        self.assertEqual(commande[-3:], ["exporter_xmp", "--photos", str(self.wa.pk)])
         self.assertEqual(reponse.json()["medias"][0]["jour"], "2025-06-01")
         self.wa.refresh_from_db()
         self.assertEqual(self.wa.prise_le, tokyo(1, 10, 30))
@@ -388,6 +394,12 @@ class EcranCompletionTests(TestCase):
                 self.assertEqual(reponse.status_code, 400)
                 self.assertIn("erreur", reponse.json())
         self.assertEqual(self.client.get(reverse("admin:voyages_completer_appliquer")).status_code, 405)
+        self.popen.assert_not_called()  # rien d'exporté quand rien n'a changé
+
+    @override_settings(NEXTCLOUD_DOSSIER_EXPORT="")
+    def test_sans_dossier_d_export_rien_n_est_lance(self):
+        self.assertEqual(self.poster(ids=[self.wa.pk], action="confirmer").status_code, 200)
+        self.popen.assert_not_called()
 
     def test_recherche_de_lieu_orientee_vers_le_voyage(self):
         with mock.patch("voyages.geocodage.chercher", return_value=[{"nom": "Kyoto", "lat": 35.0, "lon": 135.7}]) as cherche:

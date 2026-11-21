@@ -1,7 +1,12 @@
-"""Client WebDAV minimal pour Nextcloud, en lecture seule.
+"""Client WebDAV minimal pour Nextcloud.
 
-Deux opérations seulement : lister un dossier (PROPFIND) et télécharger un
-fichier en mémoire (GET). Rien n'est jamais écrit dans Nextcloud ni sur disque.
+Lecture : lister un dossier (PROPFIND) et télécharger un fichier en mémoire
+(GET) ; rien n'est écrit sur disque.
+
+Écriture (PUT, MKCOL) **uniquement sous le dossier d'export**
+(NEXTCLOUD_DOSSIER_EXPORT, ex. « Shared/Métadonnées ») : toute autre cible est
+refusée avant la moindre requête. Les dossiers de voyages, et donc les
+originaux, ne sont jamais modifiés.
 """
 
 from __future__ import annotations
@@ -117,7 +122,10 @@ def _prop_ok(reponse: ET.Element) -> ET.Element | None:
 
 
 class ClientWebDAV:
-    def __init__(self, url: str, utilisateur: str, mot_de_passe: str, timeout: int = 60):
+    def __init__(
+        self, url: str, utilisateur: str, mot_de_passe: str, timeout: int = 60,
+        dossier_ecriture: str | None = None,
+    ):
         if not (url and utilisateur and mot_de_passe):
             raise NextcloudErreur(
                 "NEXTCLOUD_URL, NEXTCLOUD_USER et NEXTCLOUD_PASSWORD doivent être définis dans .env"
@@ -126,6 +134,8 @@ class ClientWebDAV:
         self._jeton = base64.b64encode(f"{utilisateur}:{mot_de_passe}".encode()).decode()
         self.prefixe_dav = unquote(urlparse(self.racine).path)
         self.timeout = timeout
+        # Seul endroit où l'on peut écrire (None : aucune écriture possible).
+        self.dossier_ecriture = normaliser(dossier_ecriture) if dossier_ecriture else None
         self.session = requests.Session()
         self.session.auth = (utilisateur, mot_de_passe)
         nouvelles_tentatives = Retry(
@@ -179,6 +189,39 @@ class ClientWebDAV:
             "-i", self.url(chemin),
         ))
 
+    # --- Écriture, sous le dossier d'export seulement --------------------------
+
+    def verifier_ecriture(self, chemin: str) -> str:
+        """Renvoie le chemin normalisé s'il est strictement sous le dossier
+        d'export ; lève NextcloudErreur sinon (aucune requête n'est faite)."""
+        if not self.dossier_ecriture:
+            raise NextcloudErreur("Écriture impossible : NEXTCLOUD_DOSSIER_EXPORT n'est pas défini dans .env")
+        chemin = normaliser(chemin)
+        parties = chemin.split("/")
+        if any(p in ("", ".", "..") for p in parties) or not chemin.startswith(self.dossier_ecriture + "/"):
+            raise NextcloudErreur(f"Écriture refusée hors du dossier d'export : « {chemin} »")
+        return chemin
+
+    def ecrire(self, chemin: str, octets: bytes, type_contenu: str = "application/octet-stream"):
+        """Crée ou remplace un fichier du dossier d'export (PUT)."""
+        chemin = self.verifier_ecriture(chemin)
+        self._requete("PUT", chemin, data=octets, headers={"Content-Type": type_contenu})
+
+    def creer_dossiers(self, dossier: str):
+        """Crée `dossier` et ses parents sous le dossier d'export (MKCOL).
+        Un dossier qui existe déjà (405) n'est pas une erreur."""
+        dossier = self.verifier_ecriture(dossier)
+        relatif = dossier[len(self.dossier_ecriture) + 1:].split("/")
+        courant = self.dossier_ecriture
+        for partie in relatif:
+            courant = f"{courant}/{partie}"
+            try:
+                reponse = self.session.request("MKCOL", self.url(courant) + "/", timeout=self.timeout)
+            except requests.RequestException as exc:
+                raise NextcloudErreur(f"Nextcloud injoignable ({type(exc).__name__})") from None
+            if reponse.status_code not in (201, 405):
+                raise NextcloudErreur(f"Nextcloud a répondu {reponse.status_code} en créant « {courant} »")
+
     def _propfind(self, dossier: str) -> list[FichierDistant]:
         url = self.url(dossier)
         if not url.endswith("/"):
@@ -209,4 +252,7 @@ def client_depuis_settings() -> ClientWebDAV:
     """Client configuré par les variables NEXTCLOUD_* du .env."""
     from django.conf import settings
 
-    return ClientWebDAV(settings.NEXTCLOUD_URL, settings.NEXTCLOUD_USER, settings.NEXTCLOUD_PASSWORD)
+    return ClientWebDAV(
+        settings.NEXTCLOUD_URL, settings.NEXTCLOUD_USER, settings.NEXTCLOUD_PASSWORD,
+        dossier_ecriture=settings.NEXTCLOUD_DOSSIER_EXPORT or None,
+    )

@@ -9,7 +9,10 @@ La logique d'écriture vit dans voyages/completion.py.
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from datetime import date, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -248,6 +251,18 @@ def _nombre(valeur, nom: str) -> float:
         raise completion.CompletionErreur(f"{nom} invalide.") from None
 
 
+def lancer_export_xmp(ids: list[int]) -> subprocess.Popen | None:
+    """Écrit les sidecars XMP des médias modifiés, en arrière-plan : une coupure
+    de Nextcloud ne bloque jamais la saisie (relance : `exporter_xmp`)."""
+    if not settings.NEXTCLOUD_DOSSIER_EXPORT:
+        return None
+    commande = [
+        sys.executable, str(Path(settings.BASE_DIR) / "manage.py"),
+        "exporter_xmp", "--photos", ",".join(map(str, sorted(ids))),
+    ]
+    return subprocess.Popen(commande, start_new_session=True, stdin=subprocess.DEVNULL)
+
+
 def appliquer(request):
     """POST JSON {voyage, ids, action, …} → applique l'action au lot.
 
@@ -288,5 +303,6 @@ def appliquer(request):
             raise completion.CompletionErreur("Action inconnue.")
     except completion.CompletionErreur as exc:
         return JsonResponse({"erreur": str(exc)}, status=400)
+    lancer_export_xmp(ids)
     a_jour = _requete_medias(voyage).filter(pk__in=ids)
     return JsonResponse({"medias": [serialiser(p, tz) for p in a_jour]})
