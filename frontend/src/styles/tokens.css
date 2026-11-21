@@ -38,6 +38,8 @@
   --rayon-carte: var(--rayon-visuel);
   --carte-min: 320px; /* largeur mini d'une carte de voyage (accueil) */
   --h-galerie-large: 320px; /* hauteur de rangée de la galerie, écran ≥ 1200 px */
+  --ecart-colonnes: clamp(2rem, 4vw, 4rem); /* entre la carte et les jours (ordinateur) */
+  --ecart-parcours: clamp(1.5rem, 4vw, 3rem); /* au-dessus de la carte */
   --carte-haut: 1rem; /* carte du voyage collante (ordinateur) */
   --carte-hauteur: calc(100vh - 2rem);
   --carte-hauteur-max: 820px;

@@ -56,6 +56,8 @@ html[data-largeur="serre"] {
   --rayon-visuel: 0px;
   --debord-carte: 0px;
   --rayon-carte: var(--rayon);
+  --ecart-colonnes: var(--marge);
+  --ecart-parcours: var(--marge);
 }
 
 @media (min-width: 900px) {
