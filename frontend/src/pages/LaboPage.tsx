@@ -7,7 +7,7 @@ import {
   REGLAGES_DEFAUT,
   VARIANTES_APPARITION,
   VARIANTES_COLLANT,
-  VARIANTES_OUVERTURE,
+
   enregistrerReglages,
   reglages,
 } from "../lib/mouvement";
@@ -55,8 +55,6 @@ const LIBELLES: Record<string, string> = {
   cascade: "cascade",
   pousse: "chaque heure poussée par la suivante",
   bandeau: "bandeau unique",
-  efface: "s'efface en glissant",
-  decale: "glisse seulement",
 };
 
 /** Vitesses de lecture de T5, en px/s. */
@@ -208,7 +206,6 @@ export default function LaboPage() {
             [
               ["apparition", "Apparition des photos", VARIANTES_APPARITION],
               ["collant", "Heure collante", VARIANTES_COLLANT],
-              ["ouverture", "Photo d'ouverture", VARIANTES_OUVERTURE],
             ] as const
           ).map(([cle, libelle, valeurs]) => (
             <label key={cle}>

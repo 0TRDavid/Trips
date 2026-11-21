@@ -1,16 +1,20 @@
-import { useMemo, useRef, type CSSProperties } from "react";
-import { Link } from "react-router";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { Link, useNavigate } from "react-router";
 import type { BlocRecit, PhotoJour } from "../api/types";
 import { useApparitionPhotos } from "../hooks/useApparitionPhotos";
+import { useDefilementParPage } from "../hooks/useDefilementParPage";
 import { ContexteLecture, useNouveauChefDeLecture } from "../hooks/useLecture";
 import { chemins } from "../lib/chemins";
 import { dateCourte, heureLocale, libelleHeure } from "../lib/dates";
 import { reglages, type VarianteCollant } from "../lib/mouvement";
+import { galeriePleinEcran, mosaiquePleinEcran } from "../lib/rangees";
 import { bornesHeures, entremeler } from "../lib/recit";
+import { placeholderDataUrl } from "../lib/placeholder";
 import { ratio } from "../lib/rendus";
 import { idPhoto } from "../lib/transitions";
 import { aUneVideo, formatDuree } from "../lib/videos";
 import BandeauHeure from "./BandeauHeure";
+import FriseHeures from "./FriseHeures";
 import Photo from "./Photo";
 import PhotoAnimee from "./PhotoAnimee";
 import ProgressionJour from "./ProgressionJour";
@@ -21,6 +25,8 @@ type Props = {
   slug: string;
   date: string;
   photos: PhotoJour[];
+  /** Page du jour suivant : la molette y mène depuis la dernière page (plein écran). */
+  suivant?: string;
   /** Récit découpé aux marqueurs `[[14h]]` (API : recit_blocs). */
   blocs: BlocRecit[];
   /** Visionneuse ouverte : les photos animées de la page se taisent. */
@@ -45,40 +51,42 @@ type Props = {
  * - une seule photo animée joue, la plus proche du centre (lib/lecture.ts) ;
  * - le filet de l'intitulé collant se remplit avec le défilement.
  */
-export default function GaleriePhotos({ slug, date, photos, blocs, suspendu }: Props) {
+export default function GaleriePhotos({ slug, date, photos, blocs, suspendu, suivant }: Props) {
   const racine = useRef<HTMLDivElement>(null);
   const elements = useMemo(() => entremeler(photos, blocs), [photos, blocs]);
+  const heuresMoments = useMemo(
+    () => elements.flatMap((e) => (e.genre === "moment" ? [e.heure] : [])),
+    [elements],
+  );
   const bornes = useMemo(() => bornesHeures(photos), [photos]);
   const collant: VarianteCollant = reglages().collant;
+  // Ordinateur : mosaïque plein écran, page par page. Téléphone : rangées, défilement libre.
+  const pleinEcran = galeriePleinEcran();
+  const naviguer = useNavigate();
+  const place = usePlacePleinEcran(racine, pleinEcran);
+  const versSuivant = useMemo(() => (suivant ? () => naviguer(suivant) : undefined), [suivant, naviguer]);
+  useDefilementParPage(racine, !!place, place?.haut ?? 0, versSuivant);
   const chef = useNouveauChefDeLecture(suspendu);
   useApparitionPhotos(racine, true);
   let numero = 0;
 
   return (
     <ContexteLecture.Provider value={chef}>
-      <div ref={racine} className={styles.journee} data-collant={collant}>
+      <div ref={racine} className={styles.journee} data-collant={collant} data-plein-ecran={pleinEcran ? "" : undefined}>
+        {pleinEcran && <div className={styles.sonde} aria-hidden />}
+        {place && <FriseHeures racine={racine} heures={heuresMoments} haut={place.haut} />}
         {collant === "bandeau" && bornes && <BandeauHeure racine={racine} bornes={bornes} />}
         {elements.map((element, i) => {
           if (element.genre === "recit") {
             return <BlocDuRecit key={`r${i}`} html={element.html} />;
           }
           const idTitre = `moment-${numero++}`;
-          // Largeur « naturelle » du moment, en hauteurs de rangée (somme des
-          // ratios) : un moment court (sans récit au milieu) tient sur une
-          // seule rangée sur ordinateur et partage sa ligne (GaleriePhotos.module.css).
-          const somme = element.segments.reduce(
-            (total, s) => (s.genre === "photos" ? total + s.photos.reduce((t, p) => t + ratio(p), 0) : total),
-            0,
-          );
-          const court = somme <= SOMME_COURT && element.segments.length === 1;
           return (
             <section
               key={`m${i}-${element.heure}`}
               className={styles.moment}
               aria-labelledby={idTitre}
               data-heure={element.heure ?? ""}
-              data-court={court ? "" : undefined}
-              style={{ "--somme": somme } as CSSProperties}
             >
               <h2 id={idTitre} className={styles.heure}>
                 <span className={styles.libelle}>{libelleHeure(element.heure)}</span>
@@ -88,7 +96,11 @@ export default function GaleriePhotos({ slug, date, photos, blocs, suspendu }: P
                 segment.genre === "recit" ? (
                   <BlocDuRecit key={`r${j}`} html={segment.html} />
                 ) : (
-                  <Rangees key={`p${j}`} slug={slug} date={date} photos={segment.photos} />
+                  place ? (
+                    <MosaiquePleinEcran key={`p${j}`} slug={slug} date={date} photos={segment.photos} place={place} />
+                  ) : (
+                    <Rangees key={`p${j}`} slug={slug} date={date} photos={segment.photos} />
+                  )
                 ),
               )}
             </section>
@@ -99,12 +111,9 @@ export default function GaleriePhotos({ slug, date, photos, blocs, suspendu }: P
   );
 }
 
-/** Un moment « court » est ramené sur une rangée : jusqu'à 4 paysages 3:2 ou 6 portraits. */
-const SOMME_COURT = 6;
-
 function BlocDuRecit({ html }: { html: string }) {
   return (
-    <div className={styles.recit} data-apparition="">
+    <div className={styles.recit} data-apparition="" data-ancre="">
       <Recit html={html} />
     </div>
   );
@@ -118,40 +127,148 @@ function Rangees({ slug, date, photos }: PropsRangees) {
       {photos.map((photo) => {
         const r = ratio(photo);
         // Largeur affichée ≈ ratio × hauteur de rangée (avec marge pour l'étirement).
-        const sizes = `(min-width: 1700px) ${Math.round(r * 400 * 1.5)}px, (min-width: 1200px) ${Math.round(r * 320 * 1.5)}px, (min-width: 700px) ${Math.round(r * 260 * 1.5)}px, min(100vw, ${Math.round(r * 110 * 2)}px)`;
-        const nature = photo.type === "video" ? "Vidéo" : "Photo";
-        const alt = photo.legende || `${nature} du ${dateCourte(date)}${photo.prise_le ? ` à ${heureLocale(photo.prise_le)}` : ""}`;
-        const image =
-          photo.type === "animee" && aUneVideo(photo) ? (
-            <PhotoAnimee photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} />
-          ) : (
-            <Photo photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} />
-          );
+        const sizes = `(min-width: 1700px) ${Math.round(r * 400 * 1.5)}px, (min-width: 1200px) ${Math.round(r * 320 * 1.5)}px, (min-width: 700px) ${Math.round(r * 260 * 1.5)}px, min(100vw, ${Math.round(r * 150 * 2)}px)`;
         return (
-          <li key={photo.id} className={styles.cellule} style={{ "--ratio": r } as CSSProperties} data-apparition="">
-            <Link
-              to={chemins.photo(slug, date, photo.id)}
-              // La page jour reste en place derrière la visionneuse.
-              preventScrollReset
-              state={{ depuisJour: true }}
-              className={styles.lien}
-            >
-              {image}
-              {photo.type === "video" && (
-                <span className={styles.badgeVideo} aria-hidden="true">
-                  <span className={styles.triangle}>▶</span>
-                  {formatDuree(photo.duree)}
-                </span>
-              )}
-              {photo.favori && (
-                <span className={styles.favori} title="Favori" aria-label="Favori">
-                  ★
-                </span>
-              )}
-            </Link>
-          </li>
+          <Cellule key={photo.id} slug={slug} date={date} photo={photo} sizes={sizes} style={{ "--ratio": r } as CSSProperties} />
         );
       })}
     </ul>
+  );
+}
+
+/** largeur : de la frise au bord droit de l'écran ; ecran : hauteur d'une page ; haut : barre du jour (px). */
+type Place = { largeur: number; ecran: number; haut: number };
+
+/**
+ * Mosaïque plein écran (ordinateur) : deux photos par écran, bord à bord (côte à côte,
+ * ou l'une sur l'autre pour des panoramas : lib/rangees.ts). Une photo seule
+ * garde ses proportions, sur sa version floue.
+ */
+function MosaiquePleinEcran({ slug, date, photos, place }: PropsRangees & { place: Place }) {
+  const pages = useMemo(
+    () => mosaiquePleinEcran(photos.map(ratio), place.largeur, place.ecran),
+    [photos, place],
+  );
+  return (
+    <div className={styles.pages}>
+      {pages.map(({ gabarit, debut, cases }) => {
+        if (gabarit === "seule") {
+          // Photo seule : entière, sur sa version floue étirée aux côtés.
+          const photo = photos[debut];
+          const fond = placeholderDataUrl(photo.placeholder);
+          return (
+            <div key={debut} className={styles.pagePhoto} style={{ height: place.ecran }} data-ancre="">
+              {fond && <div className={styles.fondFlou} style={{ backgroundImage: `url(${fond})` }} aria-hidden />}
+              <ul className={styles.listePhoto}>
+                <Cellule
+                  slug={slug}
+                  date={date}
+                  photo={photo}
+                  sizes={`${Math.round(ratio(photo) * place.ecran)}px`}
+                  className={styles.cellulePhoto}
+                  style={{}}
+                  mode="contenir"
+                />
+              </ul>
+            </div>
+          );
+        }
+        return (
+          <ul key={debut} className={styles.mosaique} style={{ height: place.ecran }} data-ancre="">
+            {cases.map((c, k) => {
+              const photo = photos[debut + k];
+              return (
+                <Cellule
+                  key={photo.id}
+                  slug={slug}
+                  date={date}
+                  photo={photo}
+                  sizes={`${Math.round(c.l * place.largeur)}px`}
+                  className={styles.tuile}
+                  style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%`, width: `${c.l * 100}%`, height: `${c.h * 100}%` }}
+                  mode="couvrir"
+                />
+              );
+            })}
+          </ul>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Place d'une page plein écran : hauteur de l'écran moins la barre du jour
+ * (mesurée par la sonde ; l'intitulé d'heure, caché, ne compte pas), et
+ * largeur de la frise des heures au bord droit de l'écran.
+ */
+function usePlacePleinEcran(racine: RefObject<HTMLDivElement | null>, actif: boolean): Place | null {
+  const [place, setPlace] = useState<Place | null>(null);
+  useEffect(() => {
+    const el = racine.current;
+    if (!actif || !el) return;
+    const mesurer = () => {
+      const haut = el.querySelector<HTMLElement>(`.${styles.sonde}`)?.offsetHeight ?? 0;
+      const ecran = Math.max(window.innerHeight - haut, 200);
+      // Les pages vont jusqu'au bord droit de l'écran ; à gauche, la frise.
+      const gauche = el.getBoundingClientRect().left + (parseFloat(getComputedStyle(el).paddingLeft) || 0);
+      const largeur = document.documentElement.clientWidth - gauche;
+      setPlace((p) => (p && p.largeur === largeur && p.ecran === ecran && p.haut === haut ? p : { largeur, ecran, haut }));
+    };
+    mesurer();
+    const observateur = new ResizeObserver(mesurer);
+    observateur.observe(el);
+    window.addEventListener("resize", mesurer);
+    return () => {
+      observateur.disconnect();
+      window.removeEventListener("resize", mesurer);
+    };
+  }, [racine, actif]);
+  return actif ? place : null;
+}
+
+type PropsCellule = {
+  slug: string;
+  date: string;
+  photo: PhotoJour;
+  sizes: string;
+  style: CSSProperties;
+  className?: string;
+  /** Mode d'affichage de Photo ("naturel" par défaut ; plein écran : couvrir / contenir). */
+  mode?: "naturel" | "couvrir" | "contenir";
+};
+
+function Cellule({ slug, date, photo, sizes, style, className, mode }: PropsCellule) {
+  const nature = photo.type === "video" ? "Vidéo" : "Photo";
+  const alt = photo.legende || `${nature} du ${dateCourte(date)}${photo.prise_le ? ` à ${heureLocale(photo.prise_le)}` : ""}`;
+  const image =
+    photo.type === "animee" && aUneVideo(photo) ? (
+      <PhotoAnimee photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} mode={mode} />
+    ) : (
+      <Photo photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} mode={mode} />
+    );
+  return (
+    <li className={className ?? styles.cellule} style={style} data-apparition="">
+      <Link
+        to={chemins.photo(slug, date, photo.id)}
+        // La page jour reste en place derrière la visionneuse.
+        preventScrollReset
+        state={{ depuisJour: true }}
+        className={styles.lien}
+      >
+        {image}
+        {photo.type === "video" && (
+          <span className={styles.badgeVideo} aria-hidden="true">
+            <span className={styles.triangle}>▶</span>
+            {formatDuree(photo.duree)}
+          </span>
+        )}
+        {photo.favori && (
+          <span className={styles.favori} title="Favori" aria-label="Favori">
+            ★
+          </span>
+        )}
+      </Link>
+    </li>
   );
 }

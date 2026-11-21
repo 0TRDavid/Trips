@@ -26,8 +26,10 @@
   pointer-events: none;
 }
 
-/* Visionneuse ouverte : la marque ne passe pas par-dessus. */
-:global(html.sans-defilement) .entete {
+/* Visionneuse ouverte, ou page jour (photo d'ouverture plein écran) : la
+   marque ne passe pas par-dessus. */
+:global(html.sans-defilement) .entete,
+:global(html.sans-marque) .entete {
   visibility: hidden;
 }
 

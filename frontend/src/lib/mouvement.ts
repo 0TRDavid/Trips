@@ -63,10 +63,8 @@ export function publierDureesCss(racine: HTMLElement = document.documentElement)
 /** Page jour (étape 6b) : variantes comparées au labo. */
 export const VARIANTES_APPARITION = ["aucune", "fondu", "montee", "cascade"] as const;
 export const VARIANTES_COLLANT = ["pousse", "bandeau"] as const;
-export const VARIANTES_OUVERTURE = ["efface", "decale"] as const;
 export type VarianteApparition = (typeof VARIANTES_APPARITION)[number];
 export type VarianteCollant = (typeof VARIANTES_COLLANT)[number];
-export type VarianteOuverture = (typeof VARIANTES_OUVERTURE)[number];
 
 export type Reglages = {
   /** Multiplicateur des durées (1 = normal, 4 = quatre fois plus lent). */
@@ -77,8 +75,6 @@ export type Reglages = {
   apparition: VarianteApparition;
   /** Intitulé d'heure collant : chaque intitulé poussé par le suivant, ou un bandeau unique. */
   collant: VarianteCollant;
-  /** Photo d'ouverture au défilement : s'efface en se décalant, ou se décale seulement. */
-  ouverture: VarianteOuverture;
 };
 
 export const REGLAGES_DEFAUT: Reglages = {
@@ -86,7 +82,6 @@ export const REGLAGES_DEFAUT: Reglages = {
   reduit: false,
   apparition: "montee",
   collant: "pousse",
-  ouverture: "efface",
 };
 
 const choix = <T extends string>(valeurs: readonly T[], lu: unknown, defaut: T): T =>
@@ -107,7 +102,6 @@ function lireReglages(): Reglages {
       reduit: lu.reduit === true,
       apparition: choix(VARIANTES_APPARITION, lu.apparition, REGLAGES_DEFAUT.apparition),
       collant: choix(VARIANTES_COLLANT, lu.collant, REGLAGES_DEFAUT.collant),
-      ouverture: choix(VARIANTES_OUVERTURE, lu.ouverture, REGLAGES_DEFAUT.ouverture),
     };
   } catch {
     return REGLAGES_DEFAUT;
@@ -312,10 +306,20 @@ export function transitionFondVisionneuse(sens: Sens, reduit: boolean): Transiti
 
 /** Réglages du défilement de la page jour. */
 export const defilement = {
-  /** Photo d'ouverture : décalage (en % de sa hauteur) et opacité quand elle a quitté l'écran. */
-  ouverture: { decalage: 25, opaciteFin: 0.4 },
+  /** Ouverture plein écran : étapes (précision du recadrage), part de la
+   *  course consacrée au rétrécissement (le reste : le titre passe sous la
+   *  photo), glissement (px) du titre qui arrive de la gauche, course minimale
+   *  (fraction de la hauteur d'écran), marge (px) entre le titre et le bas
+   *  de la photo (la place de l'indication « Glisser »), part de la course au
+   *  bout de laquelle l'indication a disparu, amplitude (px) et durée (s) de
+   *  son rebond. */
+  plein: { etapes: 16, rapport: 0.7, glissementTitre: 56, courseMin: 0.6, margeTitre: 88, finIndice: 0.15, finRecit: 0.3, rebond: 8, dureeRebond: 1.6 },
   /** Apparition des photos : distance (px), décalage entre deux photos d'un même lot (s), plafond du décalage. */
   apparition: { montee: 12, cascade: 28, intervalle: 0.04, intervalleCascade: 0.07, maxDecales: 6 },
+  /** Galerie plein écran (page par page) : silence (s) de la
+   *  molette au-delà duquel un cran est un nouveau geste ; en deçà, il fait
+   *  partie du même geste et il est absorbé. */
+  aimant: { calme: 0.2 },
   /** Roulement de l'heure dans le bandeau (fraction de la hauteur du libellé). */
   roulement: 0.6,
   /** Photo animée : temps (s) pendant lequel elle doit rester la plus proche du
@@ -381,11 +385,142 @@ export function roulementHeure(sens: Sens, reduit: boolean): { entree: Animation
   };
 }
 
-/** Photo d'ouverture, liée au défilement (de « en haut de l'écran » à « sortie de l'écran »). */
-export function ouvertureAuDefilement(variante: VarianteOuverture): Record<string, string[] | number[]> {
-  const o = defilement.ouverture;
-  const decalage = { transform: ["translate(0px, 0%)", `translate(0px, ${o.decalage}%)`] };
-  return variante === "efface" ? { ...decalage, opacity: [1, o.opaciteFin] } : decalage;
+/** Mesures de l'ouverture plein écran, en px (coordonnées de la page) : haut
+ *  du cadre, sa hauteur dans la page (le bandeau), sa hauteur visible au départ
+ *  (jusqu'au bas de l'écran) et le bas du titre à sa place, sous le bandeau. */
+export type MesuresPlein = { haut: number; bandeau: number; plein: number; basTitre: number };
+
+type ImagesPlein = {
+  cadre: { transform: string[] };
+  photo: { transform: string[] };
+  voile: { opacity: number[] };
+  titreSurPhoto: { opacity: number[]; transform: string[] };
+  titre: { opacity: number[]; transform: string[] };
+  indice: { opacity: number[] };
+  /** Récit posé sur la couverture : s'efface au début de la course. */
+  recit: { opacity: number[] };
+};
+
+/**
+ * Ouverture plein écran, liée au défilement. Images régulièrement espacées
+ * (une par étape) :
+ * - de 0 à `rapport` : le cadre, haut de `bandeau` dans la page, passe de
+ *   « étiré jusqu'au bas de l'écran » (scaleY) à sa taille. La photo, haute de
+ *   `plein`, est contre-étirée et recentrée : jamais déformée, seulement
+ *   recadrée (plusieurs étapes, car 1/s n'est pas linéaire). Le titre reste
+ *   collé au bas de la photo, posé dessus ;
+ * - de `rapport` à 1 : le titre passe sous la photo, à sa place, et sa
+ *   version claire cède la place au titre normal ; le voile s'efface.
+ */
+export function ouverturePleinEcran({ haut, bandeau, plein, basTitre }: MesuresPlein): ImagesPlein {
+  const { etapes: n, rapport, margeTitre } = defilement.plein;
+  const s0 = Math.max(plein / bandeau, 1);
+  const collé = (s: number) => Math.min(haut + bandeau * s - margeTitre - basTitre, 0);
+  const finCollé = collé(1);
+  const o: ImagesPlein = {
+    cadre: { transform: [] },
+    photo: { transform: [] },
+    voile: { opacity: [] },
+    titreSurPhoto: { opacity: [], transform: [] },
+    titre: { opacity: [], transform: [] },
+    indice: { opacity: [] },
+    recit: { opacity: [] },
+  };
+  for (let i = 0; i <= n; i++) {
+    const p = i / n;
+    const q = Math.min(p / rapport, 1); // avancement du rétrécissement
+    const r = p <= rapport ? 0 : (p - rapport) / (1 - rapport); // avancement du passage sous la photo
+    const s = s0 + (1 - s0) * q;
+    // Photo de hauteur `plein` dans un cadre de hauteur `bandeau` étiré de s :
+    // scaleY(1/s) l'annule, translateY la centre dans le cadre.
+    o.cadre.transform.push(`scale(1, ${s})`);
+    o.photo.transform.push(`translate(0px, ${bandeau / 2 - plein / (2 * s)}px) scale(1, ${1 / s})`);
+    const ty = p <= rapport ? collé(s) : finCollé * (1 - r);
+    const decalage = `translate(0px, ${ty}px)`;
+    o.titre.transform.push(decalage);
+    o.titreSurPhoto.transform.push(decalage);
+    o.titreSurPhoto.opacity.push(1 - r);
+    o.titre.opacity.push(r);
+    o.voile.opacity.push(1 - r);
+    // L'indication « Glisser » s'efface dès les premiers pixels de défilement.
+    o.indice.opacity.push(Math.max(1 - p / defilement.plein.finIndice, 0));
+    o.recit.opacity.push(Math.max(1 - p / defilement.plein.finRecit, 0));
+  }
+  return o;
+}
+
+/** Course de l'ouverture (px de défilement) : au moins une fraction de l'écran, pour qu'elle ne soit pas brusque. */
+export const courseOuverture = (m: MesuresPlein, hauteurEcran: number) =>
+  Math.max((m.plein - m.bandeau) / defilement.plein.rapport, hauteurEcran * defilement.plein.courseMin, 1);
+
+/** Repère de la frise des heures : glisse d'un libellé à l'autre (px, depuis le haut de la frise). */
+export function deplacementFrise(depart: number, arrivee: number, reduit: boolean): AnimationNative {
+  if (reduit) {
+    return { images: [{ opacity: 0 }, { opacity: 1 }], options: { duration: t(DUREE_REDUITE) * 1000, easing: "linear" } };
+  }
+  return {
+    images: [{ transform: `translate(0px, ${depart}px)` }, { transform: `translate(0px, ${arrivee}px)` }],
+    options: { duration: t(duree.normale) * 1000, easing: cssBezier(courbe.standard) },
+  };
+}
+
+/** Barre du jour (en-tête compact sur la photo de couverture) : apparaît en
+ *  descendant du haut de l'écran, repart plus vite qu'elle n'est venue. */
+export function barreJour(visible: boolean, reduit: boolean): AnimationNative {
+  const cachee = { opacity: 0, transform: "translate(0px, -100%)" };
+  const montree = { opacity: 1, transform: "none" };
+  if (reduit) {
+    return {
+      images: visible ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0 }],
+      options: { duration: t(DUREE_REDUITE) * 1000, easing: "linear" },
+    };
+  }
+  return visible
+    ? { images: [cachee, montree], options: { duration: t(duree.normale) * 1000, easing: cssBezier(courbe.entree) } }
+    : { images: [{ ...montree, transform: "translate(0px, 0%)" }, cachee], options: { duration: t(duree.normale * facteurSortie) * 1000, easing: cssBezier(courbe.sortie) } };
+}
+
+/** Récit du jour sur la couverture (variantes plein écran) : arrive de la droite au premier cran. */
+export function recitCouverture(visible: boolean, reduit: boolean): AnimationNative {
+  const cache = { opacity: 0, transform: `translate(${defilement.plein.glissementTitre}px, 0px)` };
+  const montre = { opacity: 1, transform: "none" };
+  if (reduit) {
+    return {
+      images: visible ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 1 }, { opacity: 0 }],
+      options: { duration: t(DUREE_REDUITE) * 1000, easing: "linear" },
+    };
+  }
+  return visible
+    ? { images: [cache, montre], options: { duration: t(duree.lente) * 1000, easing: cssBezier(courbe.entree) } }
+    : { images: [{ ...montre, transform: "translate(0px, 0px)" }, cache], options: { duration: t(duree.normale * facteurSortie) * 1000, easing: cssBezier(courbe.sortie) } };
+}
+
+/** Rebond de la flèche « Glisser » (en boucle). Null en mouvement réduit : elle reste immobile. */
+export function rebondIndice(reduit: boolean): AnimationNative | null {
+  if (reduit) return null;
+  const { rebond, dureeRebond } = defilement.plein;
+  return {
+    images: [
+      { transform: "translate(0px, 0px)" },
+      { transform: `translate(0px, ${rebond}px)` },
+      { transform: "translate(0px, 0px)" },
+    ],
+    options: { duration: t(dureeRebond) * 1000, easing: cssBezier(courbe.standard), iterations: Infinity },
+  };
+}
+
+/** Le titre de l'ouverture plein écran arrive de la gauche (une fois). */
+export function arriveeTitre(reduit: boolean): AnimationNative {
+  if (reduit) {
+    return { images: [{ opacity: 0 }, { opacity: 1 }], options: { duration: t(DUREE_REDUITE) * 1000, easing: "linear", fill: "backwards" } };
+  }
+  return {
+    images: [
+      { opacity: 0, transform: `translate(${-defilement.plein.glissementTitre}px, 0px)` },
+      { opacity: 1, transform: "none" },
+    ],
+    options: { duration: t(duree.lente) * 1000, easing: cssBezier(courbe.entree), fill: "backwards" },
+  };
 }
 
 function cssBezier(c: readonly [number, number, number, number]): string {

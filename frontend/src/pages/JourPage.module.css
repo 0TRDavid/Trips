@@ -1,8 +1,10 @@
 .page {
+  /* Marge haute de la page, que la photo d'ouverture remonte (EnteteJour). */
+  --retrait-page: clamp(0.5rem, 2vw, 1.5rem);
   width: 100%;
   max-width: var(--largeur-max);
   margin: 0 auto;
-  padding: clamp(0.5rem, 2vw, 1.5rem) var(--marge) 4rem;
+  padding: var(--retrait-page) var(--marge) 4rem;
   display: grid;
   gap: clamp(1.75rem, 4vw, 3rem);
   align-content: start;

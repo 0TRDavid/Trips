@@ -1,8 +1,9 @@
 .journee {
   /* Hauteur de rangée et espace entre photos, déclarés ici pour que les
      moments s'en servent aussi (variantes « heures creuses »).
-     110 px : deux paysages 4:3 tiennent côte à côte sur un téléphone de 375 px. */
-  --h: 110px;
+     Téléphone, 150 px : un paysage occupe la largeur, deux ou trois portraits
+     se partagent une rangée. */
+  --h: 150px;
   --espace: 4px;
   display: grid;
   gap: clamp(1.25rem, 3vw, 2.25rem);
@@ -32,7 +33,8 @@
    suivante le pousse (sticky dans sa section, sans JavaScript). */
 .heure {
   position: sticky;
-  top: 0;
+  /* Sous la barre du jour, toujours affichée quand on parcourt la galerie. */
+  top: var(--hauteur-barre);
   z-index: 2;
   display: flex;
   align-items: center;
@@ -187,42 +189,200 @@
   font-size: 0.65rem;
 }
 
-/* --- Heures creuses, sur ordinateur -------------------------------------------
-   Une heure de 1 à 3 photos laissait une rangée à moitié vide ; répété heure
-   après heure, la page paraissait vide. Un moment court (data-court : au plus
-   ~6 photos paysage, sans récit au milieu) tient sur UNE rangée, quitte à
-   rétrécir ses photos plutôt que d'en laisser 1 ou 2 seules sur une 2e ligne.
-   Il réclame sa largeur naturelle (somme des ratios × hauteur) et partage sa
-   ligne avec les moments voisins s'ils y tiennent ; le reste de la ligne est
-   réparti entre eux, chaque moment grandissant au plus de 60 %. Ses photos
-   remplissent toute sa largeur. Le téléphone n'est pas concerné. */
-@media (min-width: 700px) {
-  .journee {
-    display: flex;
-    flex-wrap: wrap;
-    column-gap: var(--marge);
-  }
+/* --- Ordinateur : mosaïque plein écran, page par page ----------------------
+   Chaque page de la mosaïque occupe un écran sous la barre du jour ; la
+   molette passe d'une page à l'autre (hooks/useDefilementParPage.ts). La
+   sonde mesure la hauteur de la barre. */
+.sonde {
+  position: absolute;
+  height: var(--hauteur-barre);
+  width: 1px;
+  visibility: hidden;
+  pointer-events: none;
+}
 
-  .journee > * {
-    flex: 1 1 100%;
-    min-width: 0;
-  }
+.journee[data-plein-ecran] {
+  display: grid;
+}
 
-  .journee > .moment[data-court] {
-    flex: calc(var(--somme) * 100) 1 calc(var(--somme) * var(--h));
-    max-width: calc(var(--somme) * var(--h) * 1.6);
-  }
+/* Pages collées : la suivante commence exactement au bas de l'écran. */
+.pages {
+  display: grid;
+}
 
-  .journee > .moment[data-court] > .heure {
-    margin-inline: 0;
-    padding-inline: 0;
-  }
+/* --- Photo seule d'une mosaïque : entière, sur sa version floue ----------- */
+.pagePhoto {
+  position: relative;
+  /* Bord à bord : mange la marge de la page. */
+  margin-inline: calc(-1 * var(--marge));
+  overflow: hidden;
+  isolation: isolate;
+}
 
-  .moment[data-court] .galerie {
-    flex-wrap: nowrap;
-  }
+/* Fond d'une photo montrée entière : sa propre version floue, assombrie. */
+.fondFlou {
+  position: absolute;
+  inset: -4%;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  filter: blur(24px) brightness(0.75);
+  transform: scale(1.05);
+}
 
-  .moment[data-court] .galerie::after {
-    display: none;
-  }
+.listePhoto {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.cellulePhoto {
+  height: 100%;
+}
+
+.cellulePhoto > .lien {
+  border-radius: 0;
+}
+
+.cellulePhoto > .lien > * {
+  height: 100%;
+}
+
+/* --- Mosaïque : deux photos par écran, bord à bord ------------------------- */
+.mosaique {
+  position: relative;
+  list-style: none;
+  margin: 0 calc(-1 * var(--marge));
+  padding: 0;
+}
+
+/* Case : un fin joint entre les photos (demi-espace de chaque côté). */
+.tuile {
+  position: absolute;
+  padding: calc(var(--espace) / 2);
+}
+
+.tuile > .lien {
+  border-radius: 0;
+}
+
+.tuile > .lien > * {
+  height: 100%;
+}
+
+/* --- Frise des heures (variantes plein écran) -------------------------------
+   À gauche, fixée sous la barre du jour : toutes les heures, celle en cours
+   mise en valeur. Elle remplace l'intitulé collant (gardé pour les lecteurs
+   d'écran) ; les pages vont de la frise au bord droit de l'écran. */
+.journee[data-plein-ecran] {
+  --largeur-frise: 5.5rem;
+  padding-left: var(--largeur-frise);
+}
+
+.journee[data-plein-ecran] .moment > .heure {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.journee[data-plein-ecran] .pagePhoto,
+.journee[data-plein-ecran] .mosaique {
+  margin-left: 0;
+  margin-right: calc(-1 * var(--marge));
+}
+
+.frise {
+  position: fixed;
+  left: 0;
+  top: var(--hauteur-barre);
+  bottom: 0;
+  z-index: 3;
+  width: calc(var(--largeur-frise) + var(--marge));
+  padding: 2rem 0 2rem var(--marge);
+  display: flex;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--duree-normale) ease,
+    visibility 0s linear var(--duree-normale);
+}
+
+.frise[data-visible] {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--duree-normale) ease,
+    visibility 0s;
+}
+
+/* Visionneuse ouverte : la frise ne passe pas par-dessus. */
+:global(html.sans-defilement) .frise {
+  visibility: hidden;
+}
+
+.friseListe {
+  position: relative;
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Le fil, à gauche des heures, et le repère qui glisse dessus. */
+.friseFil {
+  position: absolute;
+  left: var(--marge);
+  top: 2rem;
+  bottom: 2rem;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--filet);
+}
+
+.friseRepere {
+  position: absolute;
+  left: calc(var(--marge) - 4px);
+  top: calc(2rem - 5px);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-vif);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-vif) 25%, transparent);
+}
+
+.friseHeure {
+  display: block;
+  padding: 0.15rem 0 0.15rem 1.1rem;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: var(--police-titre);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--encre);
+  opacity: 0.45;
+  transform-origin: left center;
+  transition:
+    opacity var(--duree-normale) ease,
+    transform var(--duree-normale) ease;
+}
+
+.friseHeure:hover {
+  opacity: 0.8;
+}
+
+.friseHeure[data-courant] {
+  opacity: 1;
+  color: var(--accent);
+  transform: scale(1.25);
 }
