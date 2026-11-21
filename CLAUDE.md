@@ -197,7 +197,7 @@ priorité n°1.
 - `docker compose exec backend python manage.py calculer_couleurs [--voyage <slug>] [--force]` : couleurs vives des médias (`Photo.couleurs`), lues dans les miniatures du cache (ni Nextcloud ni original). Fait automatiquement par `generer_rendus` pour les nouveaux médias ; à lancer pour l'existant.
 - `docker compose exec backend sh -c 'exiftool -q -a -s -gps:all -userdata:all -keys:all /cache/rendus/*/*.webp /cache/rendus/*/*.mp4'` : contrôle qu'aucun rendu ne contient de GPS (ne doit rien afficher)
 - API (lecture seule, `API_ACCES` dans `.env` : `prive-reseau` ou `connecte`) :
-  - `GET /api/voyages/` : voyages, dates, `nb_jours`, `nb_photos`, couverture (choisie, sinon premier favori, sinon première photo), `palette` (aussi sur le détail d'un voyage, chaque jour résumé et le détail d'un jour : `accent`, `accent_texte`, `sur_accent`, `fond`, `fond_2`, `degrade`)
+  - `GET /api/voyages/` : voyages, dates, `nb_jours`, `nb_photos`, couverture (choisie, sinon premier favori, sinon première photo), `palette` (aussi sur le détail d'un voyage, chaque jour résumé et le détail d'un jour : `accent`, `accent_texte`, `sur_accent`, `fond`, `fond_2`, `degrade`, `halos`)
   - `GET /api/voyages/<slug>/` : + récit d'intro (`recit_intro` et `recit_intro_html`), jours résumés, `trace` GPS allégé `[{lat, lon, jour}]`
   - `GET /api/voyages/<slug>/jours/<AAAA-MM-JJ>/` : récit (Markdown + HTML), médias visibles dans l'ordre (`prise_le` avec le décalage du voyage ; `type`, `duree`, `videos` {"720", "1080"} ; `rendus` = image ou poster), `precedent` / `suivant`
   - `GET /api/voyages/<slug>/photos/` : toutes les photos visibles du voyage
