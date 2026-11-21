@@ -16,8 +16,15 @@
 //
 // Le clone est indépendant des pages : la page de départ peut disparaître,
 // la page d'arrivée défiler ou charger, le vol continue.
+//
+// Fluidité : toute la trajectoire (ressort compris) est calculée d'avance en
+// une soixantaine d'étapes par seconde, puis confiée au navigateur
+// (Web Animations, transform seulement) qui la joue HORS du fil principal.
+// Le montage de la page d'arrivée (carte, photos) peut bloquer ce fil
+// pendant 100 ms et plus : un vol calculé image par image en JavaScript
+// saccadait à chaque blocage.
 
-import { animate } from "motion/react";
+import { cubicBezier, spring } from "motion/react";
 import type { Transition } from "motion/react";
 
 export type Rect = { x: number; y: number; w: number; h: number };
@@ -53,6 +60,33 @@ export function etatVol(depart: Rect, arrivee: Rect, photo: Taille, p: number) {
     boite: `translate(${boite.x - arrivee.x}px, ${boite.y - arrivee.y}px) scale(${sx}, ${sy})`,
     image: `scale(${k / sx}, ${k / sy})`,
   };
+}
+
+const IMAGES_PAR_SECONDE = 60;
+
+/**
+ * Avancement 0 → 1 (un ressort peut dépasser 1) échantillonné à intervalles
+ * réguliers, et durée totale en ms. Gère les ressorts et les courbes de Bézier.
+ */
+export function echantillonner(transition: Transition): { avancements: number[]; duree: number } {
+  const tr = transition as { type?: string; duration?: number; ease?: number[]; visualDuration?: number; bounce?: number };
+  const pas = 1000 / IMAGES_PAR_SECONDE;
+  const avancements: number[] = [];
+  if (tr.type === "spring") {
+    const generateur = spring({ keyframes: [0, 1], visualDuration: tr.visualDuration, bounce: tr.bounce });
+    for (let t = 0; t < 5000; t += pas) {
+      const { value, done } = generateur.next(t);
+      avancements.push(value);
+      if (done) break;
+    }
+    avancements[avancements.length - 1] = 1;
+    return { avancements, duree: (avancements.length - 1) * pas };
+  }
+  const duree = (tr.duration ?? 0.3) * 1000;
+  const courbe = tr.ease && tr.ease.length === 4 ? cubicBezier(tr.ease[0], tr.ease[1], tr.ease[2], tr.ease[3]) : (x: number) => x;
+  const n = Math.max(2, Math.ceil(duree / pas) + 1);
+  for (let i = 0; i < n; i++) avancements.push(courbe(i / (n - 1)));
+  return { avancements, duree };
 }
 
 /** Rectangle visible au moins en partie dans la fenêtre ? */
@@ -155,12 +189,14 @@ export function lancerVol({ source, cible, transition, atterri, fin }: Options) 
   calque.append(boite);
   document.body.append(calque);
 
-  const appliquer = (p: number) => {
-    const etat = etatVol(depart, arrivee, image.taille, p);
-    boite.style.transform = etat.boite;
-    img.style.transform = etat.image;
-  };
-  appliquer(0);
+  // Trajectoire calculée d'avance, jouée par le navigateur (voir en tête).
+  const { avancements, duree } = echantillonner(transition);
+  const etats = avancements.map((p) => etatVol(depart, arrivee, image.taille, p));
+  const options: KeyframeAnimationOptions = { duration: Math.max(duree, 1), easing: "linear", fill: "forwards" };
+  const animations = [
+    boite.animate(etats.map((e) => ({ transform: e.boite })), options),
+    img.animate(etats.map((e) => ({ transform: e.image })), options),
+  ];
 
   let termine = false;
   let aAtterri = false;
@@ -172,7 +208,7 @@ export function lancerVol({ source, cible, transition, atterri, fin }: Options) 
   const terminer = () => {
     if (termine) return;
     termine = true;
-    controle.stop();
+    animations.forEach((a) => a.cancel());
     atterrir();
     masques.forEach((el, i) => (el.style.opacity = opacites[i]));
     calque.remove();
@@ -182,16 +218,19 @@ export function lancerVol({ source, cible, transition, atterri, fin }: Options) 
   const vol = { arreter: terminer };
   volEnCours = vol;
 
-  const controle = animate(0, 1, { ...transition, onUpdate: appliquer });
-  controle.then(() => {
-    if (termine) return;
-    appliquer(1);
-    atterrir();
-    // L'arrivée est révélée sous le clone ; le clone part dès qu'elle est nette.
-    masques.forEach((el, i) => (el.style.opacity = opacites[i]));
-    if (arriveePrete(cible)) return terminer();
-    const imgCible = cible.querySelector("img");
-    imgCible?.addEventListener("load", () => requestAnimationFrame(terminer), { once: true });
-    setTimeout(terminer, 1200);
-  });
+  animations[0].finished.then(
+    () => {
+      if (termine) return;
+      atterrir();
+      // L'arrivée est révélée sous le clone ; le clone part dès qu'elle est nette.
+      masques.forEach((el, i) => (el.style.opacity = opacites[i]));
+      if (arriveePrete(cible)) return terminer();
+      const imgCible = cible.querySelector("img");
+      imgCible?.addEventListener("load", () => requestAnimationFrame(terminer), { once: true });
+      setTimeout(terminer, 1200);
+    },
+    () => {
+      /* annulée par terminer() */
+    },
+  );
 }

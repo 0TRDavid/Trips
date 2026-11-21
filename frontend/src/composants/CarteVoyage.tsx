@@ -5,7 +5,7 @@ import { useVolEntrant } from "../hooks/useVolEntrant";
 import { useNavigationPage } from "../layout/contexte";
 import { chemins } from "../lib/chemins";
 import { periode, pluriel } from "../lib/dates";
-import { volVoyage } from "../lib/mouvement";
+import { volEnTete } from "../lib/mouvement";
 import { variablesPalette } from "../lib/palette";
 import { idVoyage } from "../lib/transitions";
 import Photo from "./Photo";
@@ -21,7 +21,7 @@ export default function CarteVoyage({ voyage, priorite }: { voyage: VoyageResume
   useVolEntrant(
     idVoyage(voyage.slug),
     () => visuel.current,
-    () => (nav.genre === "voyage" && nav.sens === -1 ? { transition: volVoyage(-1) } : null),
+    () => (nav.genre === "voyage" && nav.sens === -1 ? { transition: volEnTete(-1) } : null),
   );
 
   return (

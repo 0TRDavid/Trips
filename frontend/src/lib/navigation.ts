@@ -42,6 +42,8 @@ export function genreNavigation(avant: string, apres: string): GenreNavigation {
   if (a.niveau === 2 && b.niveau === 2 && a.slug === b.slug) return "jour";
   const niveaux = [a.niveau, b.niveau].sort().join();
   if (niveaux === "0,1") return "voyage";
+  const slugs = [a, b].map((e) => ("slug" in e ? e.slug : null));
+  if (niveaux === "1,2" && slugs[0] === slugs[1]) return "ouvrirJour";
   return "page";
 }
 

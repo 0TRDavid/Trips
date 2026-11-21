@@ -9,10 +9,10 @@ import {
   variantesPage,
   variantesPhotoVoisine,
   volPhoto,
-  volVoyage,
+  volEnTete,
 } from "./mouvement";
 import { ecranDe, genreNavigation, navigation, sensNavigation } from "./navigation";
-import { echelleCouverture, etatVol } from "./vol";
+import { echantillonner, echelleCouverture, etatVol } from "./vol";
 
 // Réglages du labo en mémoire (pas de navigateur sous Vitest).
 beforeEach(() => {
@@ -54,7 +54,9 @@ describe("sens et genre de navigation", () => {
   it("genres : voyage entre l'accueil et un voyage, page sinon", () => {
     expect(genreNavigation("/", voyage)).toBe("voyage");
     expect(genreNavigation(voyage, "/")).toBe("voyage");
-    expect(genreNavigation(voyage, j1)).toBe("page");
+    expect(genreNavigation(voyage, j1)).toBe("ouvrirJour");
+    expect(genreNavigation(j1, voyage)).toBe("ouvrirJour");
+    expect(genreNavigation("/voyages/autre", j1)).toBe("page");
     expect(genreNavigation("/voyages/a/jours/2025-06-01", "/voyages/b/jours/2025-06-02")).toBe("page");
   });
 
@@ -65,11 +67,13 @@ describe("sens et genre de navigation", () => {
 });
 
 describe("règles du système de mouvement", () => {
-  const PERMISES = new Set(["opacity", "x", "y", "scale", "transition"]);
-  const genres: GenreNavigation[] = ["aucune", "fondu", "voyage", "jour", "page"];
+  // Seulement transform et opacity, écrits tels quels : x / y / scale de Motion
+  // seraient calculés sur le fil principal et saccaderaient.
+  const PERMISES = new Set(["opacity", "transform", "transition", "transitionEnd"]);
+  const genres: GenreNavigation[] = ["aucune", "fondu", "voyage", "ouvrirJour", "jour", "page"];
   const resoudre = (v: unknown, custom: unknown) => (typeof v === "function" ? v(custom) : v) as Record<string, unknown>;
 
-  it("n'anime que transform (x, y, scale) et opacity", () => {
+  it("n'anime que transform (translate / scale) et opacity, accélérables par le navigateur", () => {
     {
       const ensembles = [
         ...genres.flatMap((genre) =>
@@ -80,7 +84,11 @@ describe("règles du système de mouvement", () => {
       ];
       for (const [variantes, custom] of ensembles) {
         for (const etape of Object.values(variantes)) {
-          for (const prop of Object.keys(resoudre(etape, custom))) expect(PERMISES).toContain(prop);
+          const v = resoudre(etape, custom);
+          for (const prop of Object.keys(v)) expect(PERMISES).toContain(prop);
+          if (v.transform) expect(String(v.transform)).toMatch(/^(none|(translate|scale)\([^)]*\)\s*)+$/);
+          // Une entrée ne laisse aucun transform derrière elle (repère des position: fixed).
+          if (v.transitionEnd) expect(v.transitionEnd).toEqual({ transform: "none" });
         }
       }
     }
@@ -92,7 +100,7 @@ describe("règles du système de mouvement", () => {
     }
     {
       const duree = (t: { visualDuration?: number; duration?: number }) => t.visualDuration ?? t.duration ?? 0;
-      expect(duree(volVoyage(-1))).toBeLessThan(duree(volVoyage(1)));
+      expect(duree(volEnTete(-1))).toBeLessThan(duree(volEnTete(1)));
       expect(duree(volPhoto(-1))).toBeLessThan(duree(volPhoto(1)));
       for (const sens of [1, -1] as const) {
         const nav = { genre: "page", sens } satisfies Navigation;
@@ -108,20 +116,19 @@ describe("règles du système de mouvement", () => {
 
   it("le glissement change de côté avec le sens de navigation", () => {
     {
-      const x = (sens: 1 | -1) => resoudre(variantesPage.initial, { genre: "jour", sens }).x;
-      const signe = (v: unknown) => Math.sign(typeof v === "string" ? parseFloat(v) : Number(v));
+      const x = (sens: 1 | -1) => resoudre(variantesPage.initial, { genre: "jour", sens }).transform;
+      const signe = (v: unknown) => Math.sign(parseFloat(String(v).replace("translate(", "")));
       expect(signe(x(1))).toBe(1);
       expect(signe(x(-1))).toBe(-1);
       // L'ancienne page part du côté opposé.
-      expect(signe(resoudre(variantesPage.sortie, { genre: "jour", sens: 1 }).x)).toBe(-1);
+      expect(signe(resoudre(variantesPage.sortie, { genre: "jour", sens: 1 }).transform)).toBe(-1);
     }
   });
 
   it("mouvement réduit : un simple fondu, sans déplacement", () => {
     for (const etape of ["initial", "visible", "sortie"] as const) {
       const v = resoudre(variantesPage[etape], { genre: "fondu", sens: 1 });
-      expect(v.x ?? 0).toBe(0);
-      expect(v.y ?? 0).toBe(0);
+      expect(v.transform ?? "translate(0%, 0px)").toBe("translate(0%, 0px)");
     }
     expect(Object.keys(resoudre(variantesPhotoVoisine(true).initial, 1))).toEqual(["opacity"]);
   });
@@ -166,5 +173,25 @@ describe("vol d'un élément partagé", () => {
       const boite = { w: entete.w * t.sx, h: entete.h * t.sy };
       expect(ex).toBeCloseTo(echelleCouverture(boite, photo), 6); // couvre exactement (object-fit: cover)
     }
+  });
+});
+
+describe("trajectoire précalculée du vol", () => {
+  it("un ressort part de 0, finit exactement à 1, avec un léger dépassement", () => {
+    const { avancements, duree } = echantillonner(volEnTete(1));
+    expect(avancements[0]).toBe(0);
+    expect(avancements.at(-1)).toBe(1);
+    expect(Math.max(...avancements)).toBeGreaterThan(1); // rebond (bounce 0,12)
+    expect(Math.max(...avancements)).toBeLessThan(1.1);
+    expect(duree).toBeGreaterThan(300);
+    expect(duree).toBeLessThan(2000);
+  });
+
+  it("une courbe de Bézier est échantillonnée sur sa durée", () => {
+    const { avancements, duree } = echantillonner({ duration: 0.5, ease: [0.16, 1, 0.3, 1] });
+    expect(duree).toBe(500);
+    expect(avancements[0]).toBe(0);
+    expect(avancements.at(-1)).toBeCloseTo(1);
+    expect(avancements[3]).toBeGreaterThan(3 / avancements.length); // expo-out : rapide au début
   });
 });

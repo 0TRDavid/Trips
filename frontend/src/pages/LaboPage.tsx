@@ -36,7 +36,7 @@ const NOMS: Record<NomTransition, string> = {
   voyage: "T1 · Carte du voyage → en-tête",
   photo: "T2 · Miniature → plein écran → retour",
   jour: "T3 · Jour suivant, puis retour",
-  page: "T4 · Autres pages (voyage ↔ jour)",
+  page: "T4 · Vignette de la timeline → en-tête du jour",
 };
 
 export default function LaboPage() {
