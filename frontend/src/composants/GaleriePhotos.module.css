@@ -1,6 +1,24 @@
 .journee {
+  /* Hauteur de rangée et espace entre photos, déclarés ici pour que les
+     moments s'en servent aussi (variantes « heures creuses »).
+     110 px : deux paysages 4:3 tiennent côte à côte sur un téléphone de 375 px. */
+  --h: 110px;
+  --espace: 4px;
   display: grid;
   gap: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+@media (min-width: 700px) {
+  .journee {
+    --h: 260px;
+    --espace: 6px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .journee {
+    --h: var(--h-galerie-large);
+  }
 }
 
 .moment {
@@ -102,28 +120,12 @@
 }
 
 .galerie {
-  /* 110 px : deux paysages 4:3 tiennent côte à côte sur un téléphone de 375 px. */
-  --h: 110px;
-  --espace: 4px;
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
   gap: var(--espace);
-}
-
-@media (min-width: 700px) {
-  .galerie {
-    --h: 260px;
-    --espace: 6px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .galerie {
-    --h: var(--h-galerie-large);
-  }
 }
 
 /* La dernière rangée garde sa hauteur au lieu de s'étirer sur toute la largeur. */
@@ -183,4 +185,44 @@
 
 .triangle {
   font-size: 0.65rem;
+}
+
+/* --- Heures creuses, sur ordinateur -------------------------------------------
+   Une heure de 1 à 3 photos laissait une rangée à moitié vide ; répété heure
+   après heure, la page paraissait vide. Un moment court (data-court : au plus
+   ~6 photos paysage, sans récit au milieu) tient sur UNE rangée, quitte à
+   rétrécir ses photos plutôt que d'en laisser 1 ou 2 seules sur une 2e ligne.
+   Il réclame sa largeur naturelle (somme des ratios × hauteur) et partage sa
+   ligne avec les moments voisins s'ils y tiennent ; le reste de la ligne est
+   réparti entre eux, chaque moment grandissant au plus de 60 %. Ses photos
+   remplissent toute sa largeur. Le téléphone n'est pas concerné. */
+@media (min-width: 700px) {
+  .journee {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: var(--marge);
+  }
+
+  .journee > * {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .journee > .moment[data-court] {
+    flex: calc(var(--somme) * 100) 1 calc(var(--somme) * var(--h));
+    max-width: calc(var(--somme) * var(--h) * 1.6);
+  }
+
+  .journee > .moment[data-court] > .heure {
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
+  .moment[data-court] .galerie {
+    flex-wrap: nowrap;
+  }
+
+  .moment[data-court] .galerie::after {
+    display: none;
+  }
 }

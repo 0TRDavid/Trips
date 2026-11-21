@@ -63,12 +63,22 @@ export default function GaleriePhotos({ slug, date, photos, blocs, suspendu }: P
             return <BlocDuRecit key={`r${i}`} html={element.html} />;
           }
           const idTitre = `moment-${numero++}`;
+          // Largeur « naturelle » du moment, en hauteurs de rangée (somme des
+          // ratios) : un moment court (sans récit au milieu) tient sur une
+          // seule rangée sur ordinateur et partage sa ligne (GaleriePhotos.module.css).
+          const somme = element.segments.reduce(
+            (total, s) => (s.genre === "photos" ? total + s.photos.reduce((t, p) => t + ratio(p), 0) : total),
+            0,
+          );
+          const court = somme <= SOMME_COURT && element.segments.length === 1;
           return (
             <section
               key={`m${i}-${element.heure}`}
               className={styles.moment}
               aria-labelledby={idTitre}
               data-heure={element.heure ?? ""}
+              data-court={court ? "" : undefined}
+              style={{ "--somme": somme } as CSSProperties}
             >
               <h2 id={idTitre} className={styles.heure}>
                 <span className={styles.libelle}>{libelleHeure(element.heure)}</span>
@@ -88,6 +98,9 @@ export default function GaleriePhotos({ slug, date, photos, blocs, suspendu }: P
     </ContexteLecture.Provider>
   );
 }
+
+/** Un moment « court » est ramené sur une rangée : jusqu'à 4 paysages 3:2 ou 6 portraits. */
+const SOMME_COURT = 6;
 
 function BlocDuRecit({ html }: { html: string }) {
   return (
