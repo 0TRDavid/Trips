@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import { AnimatePresence, animate, motion, usePresence } from "motion/react";
 import type { PhotoJour } from "../api/types";
 import { useGlissement } from "../hooks/useGlissement";
 import { useMouvementReduit } from "../hooks/useMouvementReduit";
 import { useTouchesClavier } from "../hooks/useTouchesClavier";
+import { useVolEntrant } from "../hooks/useVolEntrant";
 import { dateCourte, heureLocale } from "../lib/dates";
+import type { Sens } from "../lib/mouvement";
+import { fondu, ressortDe, transitionFondVisionneuse, variante, variantesPhotoVoisine, volPhoto } from "../lib/mouvement";
+import { consommerRetourDejaAnime } from "../lib/navigation";
 import { srcset } from "../lib/rendus";
 import { idPhoto } from "../lib/transitions";
+import { lancerVol, selecteurTransition } from "../lib/vol";
 import { aUneVideo, formatDuree } from "../lib/videos";
 import LecteurVideo from "./LecteurVideo";
 import Photo from "./Photo";
@@ -18,10 +24,15 @@ type Props = {
   /** -1 si la photo demandée n'appartient pas à ce jour. */
   index: number;
   date: string;
+  /** Ouverte depuis la galerie (et non par un lien direct) : la miniature grandit jusqu'ici. */
+  depuisGalerie: boolean;
   precedent: () => void;
   suivant: () => void;
   fermer: () => void;
 };
+
+/** Distance (px) au-delà de laquelle une photo tirée vers le bas ferme la visionneuse. */
+const SEUIL_TIRAGE = 110;
 
 /** Précharge une photo voisine avec les mêmes srcset/sizes que l'affichage. */
 function precharger(photo: PhotoJour | undefined) {
@@ -31,30 +42,103 @@ function precharger(photo: PhotoJour | undefined) {
   img.srcset = srcset(photo);
 }
 
-/** Photo en plein écran, par-dessus la page jour. */
-export default function Visionneuse({ photos, index, date, precedent, suivant, fermer }: Props) {
+/** Miniature de la galerie (hors de la visionneuse) qui porte cet identifiant. */
+function miniature(id: string, racine: Element): HTMLElement | null {
+  for (const el of document.querySelectorAll<HTMLElement>(selecteurTransition(id))) {
+    if (!racine.contains(el)) return el;
+  }
+  return null;
+}
+
+/**
+ * Photo en plein écran, par-dessus la page jour.
+ *
+ * Mouvements (valeurs dans lib/mouvement.ts) :
+ * - ouverture depuis la galerie : la miniature grandit jusqu'à sa place
+ *   (lib/vol.ts) pendant que le fond noir apparaît ;
+ * - photo → photo : glissement court dans le sens du parcours ;
+ * - fermeture (✕, Échap, retour du navigateur) : la photo regagne sa
+ *   miniature, ramenée à l'écran juste avant. La page jour la garde montée
+ *   le temps du mouvement (AnimatePresence, usePresence) ;
+ * - variante C : tirer la photo vers le bas la réduit ; lâchée assez bas,
+ *   elle ferme la visionneuse.
+ */
+export default function Visionneuse({ photos, index, date, depuisGalerie, precedent, suivant, fermer }: Props) {
   const photo = photos[index];
   const aPrecedent = index > 0;
   const aSuivant = index >= 0 && index < photos.length - 1;
   const boutonFermer = useRef<HTMLButtonElement>(null);
   const dialogue = useRef<HTMLDivElement>(null);
+  const fond = useRef<HTMLDivElement>(null);
+  const scene = useRef<HTMLDivElement>(null);
   const mouvementReduit = useMouvementReduit();
+  const [present, retirer] = usePresence();
   // « Réduire les animations » : une photo animée reste fixe ; le bouton
   // « Animer » la joue une fois (chaque clic remonte le composant, donc rejoue).
   // Le compteur est lié à la photo : on repart de zéro en changeant de photo.
   const [animations, setAnimations] = useState({ id: -1, n: 0 });
   const nbAnimations = animations.id === photo?.id ? animations.n : 0;
 
+  // Sens du dernier changement de photo (glissement), dérivé pendant le rendu.
+  const [suivi, setSuivi] = useState<{ index: number; sens: Sens }>({ index, sens: 1 });
+  if (suivi.index !== index) setSuivi({ index, sens: index > suivi.index ? 1 : -1 });
+  const sens = suivi.index !== index ? (index > suivi.index ? 1 : -1) : suivi.sens;
+
+  // Pendant la fermeture, plus aucune commande (un second Échap fermerait la page jour).
+  const actif = present;
   useTouchesClavier({
-    Escape: fermer,
-    ArrowLeft: () => aPrecedent && precedent(),
-    ArrowRight: () => aSuivant && suivant(),
+    Escape: () => actif && fermer(),
+    ArrowLeft: () => actif && aPrecedent && precedent(),
+    ArrowRight: () => actif && aSuivant && suivant(),
   });
 
   const glissement = useGlissement((d) => {
+    if (!actif) return;
     if (d === "suivant" && aSuivant) suivant();
     if (d === "precedent" && aPrecedent) precedent();
   });
+
+  // --- Ouverture ---------------------------------------------------------------
+  const ouvertureAnimee = depuisGalerie;
+  useVolEntrant(
+    photo ? idPhoto(photo.id) : "",
+    () => (photo ? dialogue.current?.querySelector<HTMLElement>(selecteurTransition(idPhoto(photo.id))) ?? null : null),
+    () => (ouvertureAnimee && !mouvementReduit ? { transition: volPhoto(1) } : null),
+  );
+  useLayoutEffect(() => {
+    if (!ouvertureAnimee || !dialogue.current || !fond.current) return;
+    // Le fond noir et les commandes apparaissent pendant que la photo grandit ;
+    // en mouvement réduit, toute la visionneuse apparaît en fondu.
+    const cibles = mouvementReduit ? [dialogue.current] : [fond.current, ...dialogue.current.querySelectorAll("[data-chrome]")];
+    const controle = animate(cibles, { opacity: [0, 1] }, transitionFondVisionneuse(1, mouvementReduit));
+    return () => controle.stop();
+    // Au montage seulement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- Fermeture ---------------------------------------------------------------
+  useLayoutEffect(() => {
+    if (present) return;
+    const racine = dialogue.current;
+    if (!racine) return retirer();
+    racine.style.pointerEvents = "none";
+    // Geste « retour » d'iOS déjà animé par le navigateur : on n'en rajoute pas.
+    if (consommerRetourDejaAnime()) return retirer();
+
+    const id = photo ? idPhoto(photo.id) : null;
+    const source = id ? racine.querySelector<HTMLElement>(selecteurTransition(id)) : null;
+    const arrivee = id ? miniature(id, racine) : null;
+    // La miniature de la dernière photo vue est ramenée à l'écran AVANT d'y voler.
+    arrivee?.scrollIntoView({ block: "nearest" });
+
+    if (mouvementReduit || !source || !arrivee) {
+      animate(racine, { opacity: 0 }, mouvementReduit ? fondu() : transitionFondVisionneuse(-1, false)).then(retirer);
+      return;
+    }
+    animate([fond.current!, ...racine.querySelectorAll("[data-chrome]")], { opacity: 0 }, transitionFondVisionneuse(-1, false));
+    lancerVol({ source, cible: arrivee, transition: volPhoto(-1), atterri: retirer });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [present]);
 
   // Ouverture : bloque le défilement de la page dessous, place le focus dans
   // la visionneuse ; fermeture : rend le focus à l'élément d'origine.
@@ -73,6 +157,56 @@ export default function Visionneuse({ photos, index, date, precedent, suivant, f
     precharger(photos[index + 1]);
     precharger(photos[index - 1]);
   }, [photos, index]);
+
+  // --- Tirer vers le bas pour fermer (variante C) ------------------------------
+  const tirage = useRef<{ id: number; x: number; y: number; engage: boolean; dy: number } | null>(null);
+  const tirable = variante("photo") === "C" && !mouvementReduit;
+  const elementTire = () =>
+    photo ? scene.current?.querySelector<HTMLElement>(`[data-tirage="${photo.id}"]`) ?? null : null;
+
+  const surTirage = {
+    onPointerDown: (e: ReactPointerEvent) => {
+      glissement.onPointerDown(e);
+      if (!tirable || !actif || e.pointerType === "mouse") return;
+      if ((e.target as Element).closest?.("[data-sans-glissement]")) return;
+      tirage.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engage: false, dy: 0 };
+    },
+    onPointerMove: (e: ReactPointerEvent) => {
+      const t = tirage.current;
+      if (!t || t.id !== e.pointerId) return;
+      const dx = e.clientX - t.x;
+      const dy = e.clientY - t.y;
+      if (!t.engage) {
+        if (dy > 12 && dy > Math.abs(dx) * 1.2) t.engage = true;
+        else if (Math.abs(dx) > 12 || dy < -12) tirage.current = null; // glissement horizontal ou vers le haut
+        return;
+      }
+      t.dy = Math.max(0, dy);
+      const el = elementTire();
+      if (el) el.style.transform = `translate(${dx * 0.4}px, ${t.dy}px) scale(${1 - Math.min(t.dy, 400) / 1400})`;
+      if (fond.current) fond.current.style.opacity = String(1 - Math.min(t.dy / 400, 0.7));
+    },
+    onPointerUp: (e: ReactPointerEvent) => {
+      glissement.onPointerUp(e);
+      const t = tirage.current;
+      tirage.current = null;
+      if (!t?.engage) return;
+      if (t.dy > SEUIL_TIRAGE) {
+        fermer(); // la fermeture part de la position actuelle de la photo
+        return;
+      }
+      const el = elementTire();
+      if (el) animate(el, { transform: "translate(0px, 0px) scale(1)" }, ressortDe("vif"));
+      if (fond.current) animate(fond.current, { opacity: 1 }, ressortDe("vif"));
+    },
+    onPointerCancel: (e: ReactPointerEvent) => {
+      glissement.onPointerCancel(e);
+      tirage.current = null;
+      const el = elementTire();
+      if (el) el.style.transform = "";
+      if (fond.current) fond.current.style.opacity = "";
+    },
+  };
 
   // Garde le focus clavier (Tab) à l'intérieur de la visionneuse.
   const pieger = (e: ReactKeyboardEvent) => {
@@ -106,7 +240,9 @@ export default function Visionneuse({ photos, index, date, precedent, suivant, f
       aria-label={libelle}
       onKeyDown={pieger}
     >
-      <div className={styles.barre}>
+      <div ref={fond} className={styles.fond} aria-hidden />
+
+      <div className={styles.barre} data-chrome>
         <span className={styles.compteur}>{photo ? `${index + 1} / ${photos.length}` : ""}</span>
         {animee && mouvementReduit && (
           <button
@@ -122,47 +258,55 @@ export default function Visionneuse({ photos, index, date, precedent, suivant, f
         </button>
       </div>
 
-      <div className={styles.scene} {...glissement}>
-        {photo?.type === "video" ? (
-          <LecteurVideo key={photo.id} photo={photo} alt={alt} transitionId={idPhoto(photo.id)} />
-        ) : animee ? (
-          <PhotoAnimee
-            key={`${photo.id}-${nbAnimations}`}
-            photo={photo}
-            mode="contenir"
-            sizes="100vw"
-            priorite
-            alt={alt}
-            transitionId={idPhoto(photo.id)}
-            petitCote={Math.min(window.innerWidth, window.innerHeight)}
-            forcer={nbAnimations > 0}
-          />
-        ) : photo ? (
-          <Photo
-            key={photo.id}
-            photo={photo}
-            mode="contenir"
-            sizes="100vw"
-            priorite
-            alt={alt}
-            transitionId={idPhoto(photo.id)}
-          />
-        ) : (
-          <p className={styles.introuvable}>Cette photo n’existe pas dans ce jour.</p>
-        )}
-        {aPrecedent && (
-          <button type="button" className={styles.fleche} data-sens="precedent" onClick={precedent} aria-label="Photo précédente (←)">
-            ‹
-          </button>
-        )}
-        {aSuivant && (
-          <button type="button" className={styles.fleche} data-sens="suivant" onClick={suivant} aria-label="Photo suivante (→)">
-            ›
-          </button>
-        )}
+      <div ref={scene} className={styles.scene} {...surTirage}>
+        <AnimatePresence initial={false} custom={sens}>
+          <motion.div
+            key={photo?.id ?? "introuvable"}
+            className={styles.diapo}
+            custom={sens}
+            variants={variantesPhotoVoisine(mouvementReduit)}
+            initial="initial"
+            animate="visible"
+            exit="sortie"
+          >
+            <div className={styles.tirage} data-tirage={photo?.id}>
+              {photo?.type === "video" ? (
+                <LecteurVideo photo={photo} alt={alt} transitionId={idPhoto(photo.id)} />
+              ) : animee ? (
+                <PhotoAnimee
+                  key={`${photo.id}-${nbAnimations}`}
+                  photo={photo}
+                  mode="contenir"
+                  sizes="100vw"
+                  priorite
+                  alt={alt}
+                  transitionId={idPhoto(photo.id)}
+                  petitCote={Math.min(window.innerWidth, window.innerHeight)}
+                  forcer={nbAnimations > 0}
+                />
+              ) : photo ? (
+                <Photo photo={photo} mode="contenir" sizes="100vw" priorite alt={alt} transitionId={idPhoto(photo.id)} />
+              ) : (
+                <p className={styles.introuvable}>Cette photo n’existe pas dans ce jour.</p>
+              )}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+        <div className={styles.fleches} data-chrome>
+          {aPrecedent && (
+            <button type="button" className={styles.fleche} data-sens="precedent" onClick={precedent} aria-label="Photo précédente (←)">
+              ‹
+            </button>
+          )}
+          {aSuivant && (
+            <button type="button" className={styles.fleche} data-sens="suivant" onClick={suivant} aria-label="Photo suivante (→)">
+              ›
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className={styles.legende}>
+      <div className={styles.legende} data-chrome>
         {photo && (
           <>
             {photo.legende && <p className={styles.texteLegende}>{photo.legende}</p>}

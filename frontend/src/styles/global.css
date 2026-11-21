@@ -72,3 +72,38 @@ html.sans-defilement {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Calque des éléments partagés en vol (lib/vol.ts) : au-dessus de tout,
+   n'intercepte aucun clic. Seuls transform et opacity y sont animés. */
+.calque-vol {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.calque-vol-boite {
+  position: absolute;
+  overflow: hidden;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.calque-vol-boite img {
+  position: absolute;
+  max-width: none;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.calque-vol-rideau {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  transform-origin: 0 0;
+  will-change: transform;
+  transition: opacity 0.2s linear;
+}

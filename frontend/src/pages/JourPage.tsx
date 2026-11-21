@@ -1,10 +1,13 @@
+import { Fragment } from "react";
 import { useOutlet, useParams } from "react-router";
+import { AnimatePresence } from "motion/react";
 import { useJour } from "../api/requetes";
 import EnteteJour from "../composants/EnteteJour";
 import GaleriePhotos from "../composants/GaleriePhotos";
 import NavJours from "../composants/NavJours";
 import Recit from "../composants/Recit";
 import { useTitre } from "../hooks/useTitre";
+import { usePalette } from "../layout/contexte";
 import { EtatChargement, EtatErreur } from "../layout/Etats";
 import { dateCourte, estDateJour } from "../lib/dates";
 import IntrouvablePage from "./IntrouvablePage";
@@ -17,6 +20,7 @@ export default function JourPage() {
   // La visionneuse (route enfant) quand une photo est ouverte, sinon null.
   const visionneuse = useOutlet();
 
+  usePalette(jour?.palette);
   useTitre(jour ? `${jour.titre || dateCourte(jour.date)} · ${jour.voyage.titre}` : undefined);
 
   if (!dateValide) return <IntrouvablePage />;
@@ -37,7 +41,9 @@ export default function JourPage() {
         )}
         <NavJours slug={slug} precedent={jour.precedent} suivant={jour.suivant} />
       </article>
-      {visionneuse}
+      {/* AnimatePresence garde la visionneuse affichée pendant sa fermeture
+          (retour de la photo vers sa miniature, Visionneuse.tsx). */}
+      <AnimatePresence>{visionneuse && <Fragment key="visionneuse">{visionneuse}</Fragment>}</AnimatePresence>
     </>
   );
 }

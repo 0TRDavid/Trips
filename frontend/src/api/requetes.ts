@@ -33,11 +33,20 @@ export function useVoyages() {
   });
 }
 
-export function useVoyage(slug: string) {
+export function useVoyage(slug: string, actif = true) {
   return useQuery({
+    enabled: actif,
     queryKey: cles.voyage(slug),
     queryFn: ({ signal }) =>
       fetchJson<VoyageDetail>(`/api/voyages/${encodeURIComponent(slug)}/`, signal),
+    // En venant de l'accueil, le résumé du voyage est déjà en cache : l'en-tête
+    // (couverture, titre, palette) s'affiche tout de suite, et la carte de
+    // l'accueil peut s'y transformer sans attendre la réponse de l'API.
+    // `isPlaceholderData` dit à la page que le reste arrive.
+    placeholderData: (): VoyageDetail | undefined => {
+      const resume = queryClient.getQueryData<VoyageResume[]>(cles.voyages)?.find((v) => v.slug === slug);
+      return resume && { ...resume, recit_intro: "", recit_intro_html: "", jours: [], trace: [] };
+    },
   });
 }
 
@@ -52,8 +61,8 @@ function optionsJour(slug: string, date: string) {
   };
 }
 
-export function useJour(slug: string, date: string) {
-  return useQuery(optionsJour(slug, date));
+export function useJour(slug: string, date: string, actif = true) {
+  return useQuery({ ...optionsJour(slug, date), enabled: actif });
 }
 
 /** Précharge un jour (survol d'un lien) : la page s'ouvre sans attendre. */

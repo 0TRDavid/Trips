@@ -13,6 +13,10 @@ import VoyagePage from "./pages/VoyagePage";
 // montée dessous (scroll conservé), et c'est elle qui affiche la visionneuse
 // via son <Outlet />.
 export const router = createBrowserRouter([
+  // Labo des transitions : en dev uniquement, absent du build de prod.
+  ...(import.meta.env.DEV
+    ? [{ path: "/labo", lazy: async () => ({ Component: (await import("./pages/LaboPage")).default }) }]
+    : []),
   {
     element: <Layout />,
     // Une erreur de rendu inattendue reste dans le cadre du site.

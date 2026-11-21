@@ -45,6 +45,20 @@ export type PhotoJour = PhotoResume & {
   photographe: string;
 };
 
+/**
+ * Couleurs tirées des photos d'un voyage ou d'un jour (backend/voyages/palette.py).
+ * Contrastes WCAG AA garantis : `accent_texte` sur `fond` et `fond_2`,
+ * `sur_accent` sur `accent`.
+ */
+export type Palette = {
+  accent: string;
+  accent_texte: string;
+  sur_accent: string;
+  fond: string;
+  fond_2: string;
+  degrade: string[];
+};
+
 export type VoyageResume = {
   slug: string;
   titre: string;
@@ -55,6 +69,7 @@ export type VoyageResume = {
   nb_jours: number;
   nb_photos: number;
   couverture: PhotoResume | null;
+  palette: Palette;
 };
 
 export type JourResume = {
@@ -64,6 +79,7 @@ export type JourResume = {
   nb_photos: number;
   recit_rempli: boolean;
   photo: PhotoResume | null;
+  palette: Palette;
 };
 
 export type PointTrace = {
@@ -95,4 +111,5 @@ export type JourDetail = {
   photos: PhotoJour[];
   precedent: JourVoisin | null;
   suivant: JourVoisin | null;
+  palette: Palette;
 };

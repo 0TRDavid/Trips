@@ -1,9 +1,11 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { useVoyage } from "../api/requetes";
+import Apparition from "../composants/Apparition";
 import EnteteVoyage from "../composants/EnteteVoyage";
 import Recit from "../composants/Recit";
 import TimelineJours from "../composants/TimelineJours";
+import { usePalette } from "../layout/contexte";
 import { EtatChargement, EtatErreur } from "../layout/Etats";
 import { dateCourte } from "../lib/dates";
 import styles from "./VoyagePage.module.css";
@@ -14,7 +16,8 @@ const CarteParcours = lazy(() => import("../composants/CarteParcours"));
 
 export default function VoyagePage() {
   const { slug = "" } = useParams();
-  const { data: voyage, error, refetch, isPending } = useVoyage(slug);
+  const { data: voyage, error, refetch, isPending, isPlaceholderData } = useVoyage(slug);
+  usePalette(voyage?.palette);
   // Jour sélectionné (zoom de la carte). État d'écran éphémère, pas dans
   // l'URL : le retour arrière ramène à la page précédente, pas au zoom d'avant.
   const [selection, setSelection] = useState<string | null>(null);
@@ -39,17 +42,22 @@ export default function VoyagePage() {
   if (isPending) return <EtatChargement />;
   if (error) return <EtatErreur erreur={error} reessayer={refetch} />;
 
+  // Les blocs sous l'en-tête apparaissent en cascade (<Apparition>) ; tant que
+  // seul le résumé venu de l'accueil est là, leur place reste vide.
   return (
     <article className={styles.page}>
       <EnteteVoyage voyage={voyage} />
 
-      {voyage.recit_intro_html.trim() && (
-        <section className={styles.intro}>
-          <Recit html={voyage.recit_intro_html} />
-        </section>
+      {!isPlaceholderData && voyage.recit_intro_html.trim() && (
+        <Apparition className={styles.intro}>
+          <section>
+            <Recit html={voyage.recit_intro_html} />
+          </section>
+        </Apparition>
       )}
 
-      <div className={styles.parcours}>
+      {!isPlaceholderData && (
+      <Apparition className={styles.parcours}>
         <div className={styles.zoneCarte}>
           {voyage.trace.length > 0 ? (
             <>
@@ -94,7 +102,8 @@ export default function VoyagePage() {
             surSelection={selectionDepuisListe}
           />
         </section>
-      </div>
+      </Apparition>
+      )}
     </article>
   );
 }
