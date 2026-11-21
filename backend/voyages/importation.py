@@ -7,7 +7,12 @@ Relançable : une photo dont l'etag n'a pas changé n'est ni retéléchargée ni
 modifiée. Une photo déplacée dans Nextcloud (même etag, même nom, autre dossier)
 garde son identité. Le premier sous-dossier sous le dossier du voyage désigne le
 photographe (« Japon/Hugo/IMG_1.CR2 » → « Hugo »). Ce que l'auteur a saisi (titres, récits, légendes, favoris,
-visibilité, ordre) n'est jamais écrasé.
+visibilité, ordre) n'est jamais écrasé, ni une date ou une position saisie à la
+main (source « manuel », voir voyages/completion.py).
+
+Média sans date : s'il vient de WhatsApp (IMG-AAAAMMJJ-WAnnnn), la date du nom
+est proposée, « à confirmer » ; sinon, date du fichier, provisoire. Dans les
+deux cas, il reste masqué jusqu'à ce que l'auteur décide.
 """
 
 from __future__ import annotations
@@ -27,8 +32,9 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from .exif import Metadonnees, analyser_decalage, extraire_metadonnees
-from .models import Jour, Photo, Voyage
+from .models import Jour, Photo, Source, Voyage
 from .nextcloud import FichierDistant, normaliser
+from .noms import est_whatsapp, proposer_date_whatsapp
 from .video import (
     HORLOGE_NOM_DE_FICHIER,
     VideoErreur,
@@ -54,10 +60,21 @@ class Client(Protocol):
 OCTETS_EN_TETE = {".cr2": 256 * 1024}
 
 # Version de l'analyse faite à l'import. Une photo analysée par une version plus
-# ancienne est relue une fois, même si son etag n'a pas changé :
-#   1 : détection des photos animées (HEIC).
-VERSION_ANALYSE = 1
+# ancienne est relue une fois, même si son etag n'a pas changé, si l'une des
+# analyses apparues depuis la concerne :
+#   1 : détection des photos animées (HEIC) ;
+#   2 : date proposée par le nom des médias WhatsApp.
+VERSION_ANALYSE = 2
 EXTENSIONS_A_REANALYSER = {".heic", ".heif"}
+
+
+def concerne_par_analyse(fichier: FichierDistant, version: int) -> bool:
+    """Une analyse plus récente que `version` s'applique-t-elle à ce fichier ?"""
+    if version < 1 and fichier.extension in EXTENSIONS_A_REANALYSER:
+        return True
+    if version < 2 and est_whatsapp(fichier.chemin):
+        return True
+    return False
 
 
 @dataclass
@@ -165,7 +182,7 @@ def importer_voyage(
     a_traiter = images[:limite] if limite else images
 
     def a_reanalyser(photo, fichier):
-        return fichier.extension in EXTENSIONS_A_REANALYSER and photo.version_analyse < VERSION_ANALYSE
+        return concerne_par_analyse(fichier, photo.version_analyse)
 
     def a_jour(photo, fichier):
         return (
@@ -233,7 +250,7 @@ def importer_voyage(
     if horloges != voyage.horloges_appareils:
         voyage.horloges_appareils = horloges
         voyage.save(update_fields=["horloges_appareils"])
-    _mettre_a_jour_dates(voyage)
+    mettre_a_jour_dates(voyage)
     rapport.photos_en_base = Photo.objects.filter(jour__voyage=voyage).count()
     rapport.types = Counter(Photo.objects.filter(jour__voyage=voyage).values_list("type", flat=True))
     return rapport
@@ -315,38 +332,57 @@ def _importer_photo(client, voyage, tz, horloges_tz, fichier: FichierDistant, ph
         return
 
     sans_date = meta.prise_le is None
+    a_confirmer = False
     if sans_date:
         rapport.sans_date.append(fichier.chemin)
-        prise_le = (fichier.modifie_le or timezone.now()).astimezone(dt_timezone.utc)
+        proposee = proposer_date_whatsapp(fichier.chemin, fichier.modifie_le, tz)
+        if proposee is not None:
+            prise_le, source_date, a_confirmer = proposee, Source.NOM_FICHIER, True
+        else:
+            prise_le = (fichier.modifie_le or timezone.now()).astimezone(dt_timezone.utc)
+            source_date = Source.AUCUNE
     else:
         prise_le = meta.prise_le
+        source_date = Source.NOM_FICHIER if meta.date_du_nom else Source.EXIF
     date_locale = prise_le.astimezone(tz).date()
 
+    champs_date = dict(prise_le=prise_le, source_date=source_date, date_a_confirmer=a_confirmer)
+    champs_position = dict(
+        latitude=meta.latitude,
+        longitude=meta.longitude,
+        altitude=meta.altitude,
+        source_position=Source.EXIF if meta.latitude is not None else Source.AUCUNE,
+    )
+    champs = dict(
+        etag=fichier.etag,
+        appareil=meta.appareil,
+        photographe=photographe_depuis_chemin(dossier, fichier.chemin),
+        orientation=meta.orientation,
+        type=type_media,
+        duree=meta.duree,
+        version_analyse=VERSION_ANALYSE,
+    )
+    # Ce que l'auteur a saisi à la main n'est jamais remplacé par les métadonnées.
+    date_manuelle = photo is not None and photo.source_date == Source.MANUEL
+    position_manuelle = photo is not None and photo.source_position == Source.MANUEL
+    if not date_manuelle:
+        champs.update(champs_date)
+    if not position_manuelle:
+        champs.update(champs_position)
+
     with transaction.atomic():
-        jour, _ = Jour.objects.get_or_create(voyage=voyage, date=date_locale)
-        champs = dict(
-            jour=jour,
-            etag=fichier.etag,
-            prise_le=prise_le,
-            latitude=meta.latitude,
-            longitude=meta.longitude,
-            altitude=meta.altitude,
-            appareil=meta.appareil,
-            photographe=photographe_depuis_chemin(dossier, fichier.chemin),
-            orientation=meta.orientation,
-            type=type_media,
-            duree=meta.duree,
-            version_analyse=VERSION_ANALYSE,
-        )
+        if not date_manuelle:
+            jour, _ = Jour.objects.get_or_create(voyage=voyage, date=date_locale)
+            champs["jour"] = jour
         if photo is None:
-            # Sans date fiable, la photo est masquée en attendant une décision dans l'admin.
+            # Sans date fiable, la photo est masquée en attendant une décision de l'auteur.
             Photo.objects.create(
-                chemin_nextcloud=fichier.chemin, visible=not sans_date,
+                chemin_nextcloud=fichier.chemin, visible=not (sans_date or a_confirmer),
                 ordre=_rang_chronologique(jour, prise_le), **champs
             )
             rapport.creees += 1
         else:
-            if photo.jour_id != jour.id:
+            if not date_manuelle and photo.jour_id != jour.id:
                 # Elle change de jour (horloge corrigée) : elle s'intercale à son heure.
                 champs["ordre"] = _rang_chronologique(jour, prise_le)
             for nom, valeur in champs.items():
@@ -355,17 +391,24 @@ def _importer_photo(client, voyage, tz, horloges_tz, fichier: FichierDistant, ph
             rapport.mises_a_jour += 1
 
 
-def _rang_chronologique(jour: Jour, prise_le) -> int:
+def _rang_chronologique(jour: Jour, prise_le, exclure: Photo | None = None) -> int:
     """Rang d'une photo ajoutée à un jour : juste après la dernière photo (dans
     l'ordre actuel) prise avant elle. Les suivantes reculent d'un cran : l'ordre
-    choisi dans l'admin entre les photos existantes est préservé."""
-    precedente = jour.photos.filter(prise_le__lte=prise_le).aggregate(m=Max("ordre"))["m"]
-    rang = (precedente or 0) + 1
-    jour.photos.filter(ordre__gte=rang).update(ordre=F("ordre") + 1)
+    choisi dans l'admin entre les photos existantes est préservé.
+
+    `exclure` : la photo elle-même, quand elle est replacée dans son propre jour."""
+    autres = jour.photos.exclude(pk=exclure.pk) if exclure is not None else jour.photos.all()
+    precedente = autres.filter(prise_le__lte=prise_le).aggregate(m=Max("ordre"))["m"]
+    return _inserer_au_rang(autres, (precedente or 0) + 1)
+
+
+def _inserer_au_rang(autres, rang: int) -> int:
+    """Libère le rang `rang` en reculant d'un cran les photos qui l'occupent ou le suivent."""
+    autres.filter(ordre__gte=rang).update(ordre=F("ordre") + 1)
     return rang
 
 
-def _mettre_a_jour_dates(voyage: Voyage):
+def mettre_a_jour_dates(voyage: Voyage):
     """Début et fin du voyage : jours qui ont un média visible. Les médias
     masqués (sans date, rangés à la date du fichier) n'étirent pas le voyage ;
     s'il n'y a que ça, on les prend quand même."""

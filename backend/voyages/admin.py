@@ -7,6 +7,8 @@
   glisser-déposer (django-admin-sortable2).
 - Photo : liste pour chercher et corriger.
 - Action « Régénérer les rendus » sur une sélection de voyages, jours ou photos.
+- Écran « Compléter les médias » (admin_completion.py) : date et position des
+  médias qui n'en ont pas, sur une carte.
 
 Voyages, jours et photos naissent de l'import Nextcloud : on ne les crée pas
 ici, et on ne supprime ni voyage ni jour (leurs récits n'existent nulle part
@@ -31,6 +33,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.http import urlencode
 
+from . import admin_completion
 from .markdown import rendre_markdown
 from .models import Jour, Photo, Voyage
 from .widgets import ChoixCouverture, EditeurMarkdown, url_miniature
@@ -373,23 +376,32 @@ class PhotoAdmin(admin.ModelAdmin):
     list_display = ["apercu", "nom", "type", "jour", "prise_le", "photographe", "favori", "visible", "rendus_a_jour"]
     list_display_links = ["apercu", "nom"]
     list_editable = ["favori", "visible"]
-    list_filter = ["jour__voyage", "type", "photographe", "visible", "favori", "appareil"]
+    list_filter = [
+        "jour__voyage", "type", "photographe", "visible", "favori", "source_date", "date_a_confirmer",
+        "source_position", "appareil",
+    ]
     list_select_related = ["jour__voyage"]
     search_fields = ["legende", "chemin_nextcloud"]
     date_hierarchy = "prise_le"
     list_per_page = 50
     fields = [
         "apercu_grand", "apercu_video", "legende", ("favori", "visible"), ("type", "duree"), "jour", "prise_le",
+        ("source_date", "date_a_confirmer"), ("latitude", "longitude", "source_position"),
         "photographe", "appareil", ("largeur", "hauteur", "couleur"), "chemin_nextcloud",
     ]
     readonly_fields = [
         "apercu_grand", "apercu_video", "type", "duree", "jour", "prise_le", "photographe", "appareil",
         "largeur", "hauteur", "couleur", "chemin_nextcloud",
+        "source_date", "date_a_confirmer", "latitude", "longitude", "source_position",
     ]
     actions = [regenerer_photos]
+    change_list_template = "admin/voyages/photo/change_list.html"
 
     def has_add_permission(self, request):
         return False
+
+    def get_urls(self):
+        return [*admin_completion.urls(self.admin_site), *super().get_urls()]
 
     def has_delete_permission(self, request, obj=None):
         return False  # une photo disparue de Nextcloud est signalée par l'import, pas supprimée ici

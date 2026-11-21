@@ -57,6 +57,16 @@ class Jour(models.Model):
         return f"{self.voyage} — {self.date}"
 
 
+class Source(models.TextChoices):
+    """D'où vient une date ou une position. Une valeur « manuel » n'est jamais
+    écrasée par un nouvel import."""
+
+    AUCUNE = "", "aucune"
+    EXIF = "exif", "métadonnées du fichier"
+    NOM_FICHIER = "nom_fichier", "nom du fichier"
+    MANUEL = "manuel", "saisie manuelle"
+
+
 class Photo(models.Model):
     """Un média du voyage : photo, photo animée ou vidéo.
 
@@ -81,9 +91,18 @@ class Photo(models.Model):
     # plus ancienne est relue une fois (ex. détection des photos animées).
     version_analyse = models.PositiveSmallIntegerField("version de l'analyse", default=0)
     prise_le = models.DateTimeField("prise le", help_text="UTC")
+    # Sans source (« aucune »), prise_le est la date du fichier Nextcloud, provisoire.
+    source_date = models.CharField(
+        "source de la date", max_length=12, choices=Source.choices, default=Source.AUCUNE, blank=True
+    )
+    # Date proposée mais pas fiable (nom WhatsApp = date de réception) : à confirmer.
+    date_a_confirmer = models.BooleanField("date à confirmer", default=False)
     latitude = models.FloatField("latitude", null=True, blank=True)
     longitude = models.FloatField("longitude", null=True, blank=True)
     altitude = models.FloatField("altitude", null=True, blank=True)
+    source_position = models.CharField(
+        "source de la position", max_length=12, choices=Source.choices, default=Source.AUCUNE, blank=True
+    )
     appareil = models.CharField("appareil", max_length=200, blank=True)
     # Sous-dossier du voyage dans Nextcloud (« Japon/Hugo/IMG_1.CR2 » → « Hugo ») ;
     # vide pour une photo à la racine du dossier du voyage.
@@ -113,6 +132,22 @@ class Photo(models.Model):
 
     def __str__(self):
         return self.chemin_nextcloud.rsplit("/", 1)[-1]
+
+
+class LieuCherche(models.Model):
+    """Cache des recherches de lieux (géocodage Nominatim) : une même recherche
+    n'est jamais envoyée deux fois au service."""
+
+    requete = models.CharField("recherche", max_length=500, unique=True)
+    resultats = models.JSONField("résultats", default=list)
+    cree_le = models.DateTimeField("cherché le", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "lieu cherché"
+        verbose_name_plural = "lieux cherchés"
+
+    def __str__(self):
+        return self.requete
 
 
 class Rendu(models.Model):

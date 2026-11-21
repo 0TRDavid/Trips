@@ -230,6 +230,7 @@ def metadonnees_video(
     prise_le = None
     if HORLOGE_NOM_DE_FICHIER in horloges:
         prise_le = date_du_nom(nom, horloges[HORLOGE_NOM_DE_FICHIER])
+    date_lue_dans_le_nom = prise_le is not None
     if prise_le is None:
         prise_le = _date_apple(tags.get("com.apple.quicktime.creationdate")) or _date_utc(tags.get("creation_time"))
     return Metadonnees(
@@ -239,6 +240,7 @@ def metadonnees_video(
         altitude=altitude,
         appareil=appareil,
         duree=duree,
+        date_du_nom=date_lue_dans_le_nom,
     )
 
 
