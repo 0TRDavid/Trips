@@ -7,14 +7,14 @@
 /* B · Large : le contenu suit l'écran, la marge grandit un peu, la galerie
    et les cartes de l'accueil grossissent sur les grands écrans. Le récit
    garde sa largeur de lecture. */
-html:is([data-largeur="large"], [data-largeur="fond"], [data-largeur="colonnes"]) {
+html:is([data-largeur="large"], [data-largeur="fond"], [data-largeur="colonnes"], [data-largeur="serre"]) {
   --largeur-max: 100%;
   --marge: clamp(1rem, 4vw, 5rem);
   --carte-min: 340px;
 }
 
 @media (min-width: 1700px) {
-  html:is([data-largeur="large"], [data-largeur="fond"], [data-largeur="colonnes"]) {
+  html:is([data-largeur="large"], [data-largeur="fond"], [data-largeur="colonnes"], [data-largeur="serre"]) {
     --carte-min: 400px;
     --h-galerie-large: 400px;
   }
@@ -44,5 +44,24 @@ html[data-largeur="fond"] {
     --jour-recit-colonne: 1;
     --jour-suite-colonne: 2;
     --jour-recit-position: sticky;
+  }
+}
+
+/* E · Fond à fond serré : seule la couverture (voyage et jour) touche les
+   bords ; tout le reste (carte, photos, textes) garde un petit écart
+   régulier avec les bords de l'écran. */
+html[data-largeur="serre"] {
+  --marge: clamp(0.75rem, 1.5vw, 1.5rem);
+  --debord: var(--marge);
+  --rayon-visuel: 0px;
+  --debord-carte: 0px;
+  --rayon-carte: var(--rayon);
+}
+
+@media (min-width: 900px) {
+  html[data-largeur="serre"] {
+    --carte-haut: var(--marge);
+    --carte-hauteur: calc(100vh - 2 * var(--marge));
+    --carte-hauteur-max: none;
   }
 }

@@ -87,8 +87,8 @@
     top: var(--carte-haut);
     height: var(--carte-hauteur);
     max-height: var(--carte-hauteur-max);
-    margin: 0 0 0 calc(-1 * var(--debord));
-    border-radius: var(--rayon-visuel);
+    margin: 0 0 0 calc(-1 * var(--debord-carte));
+    border-radius: var(--rayon-carte);
     overflow: hidden;
     box-shadow: none;
   }

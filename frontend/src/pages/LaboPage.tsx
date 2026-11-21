@@ -53,6 +53,10 @@ const LARGEURS: Record<Largeur, { nom: string; detail: string }> = {
     nom: "D · Récit à côté",
     detail: "Comme B, et au-delà de 1400 px la page jour met le récit dans une colonne collante à gauche, la galerie à droite.",
   },
+  serre: {
+    nom: "E · Fond à fond serré",
+    detail: "Seule la couverture touche les bords ; carte, photos et textes gardent un petit écart régulier (≈ 1,5 rem) avec les bords de l'écran.",
+  },
 };
 
 /** Taille simulée du cadre « ordinateur ». */

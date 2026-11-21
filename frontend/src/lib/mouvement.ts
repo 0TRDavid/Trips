@@ -69,7 +69,7 @@ export type Reglages = {
   largeur: Largeur;
 };
 
-export const LARGEURS = ["actuelle", "large", "fond", "colonnes"] as const;
+export const LARGEURS = ["actuelle", "large", "fond", "colonnes", "serre"] as const;
 export type Largeur = (typeof LARGEURS)[number];
 
 export const REGLAGES_DEFAUT: Reglages = { ralenti: 1, reduit: false, largeur: "actuelle" };
