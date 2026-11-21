@@ -79,8 +79,21 @@ def plan_tailles(largeur: int, hauteur: int) -> list[tuple[str, int, int]]:
     return plan
 
 
-def _filtre_commun(infos: InfosVideo) -> str:
-    etapes = []
+# Rotation manuelle (degrés, sens horaire) → filtre ffmpeg, appliqué après
+# l'autorotation (matrice de la vidéo).
+_FILTRES_ROTATION = {90: "transpose=clock", 180: "hflip,vflip", 270: "transpose=cclock"}
+
+
+def filtre_rotation(rotation: int) -> str:
+    return _FILTRES_ROTATION.get(rotation % 360, "")
+
+
+def dimensions_tournees(largeur: int, hauteur: int, rotation: int) -> tuple[int, int]:
+    return (hauteur, largeur) if rotation % 180 == 90 else (largeur, hauteur)
+
+
+def _filtre_commun(infos: InfosVideo, rotation: int = 0) -> str:
+    etapes = [filtre_rotation(rotation)] if rotation % 360 else []
     if infos.hdr:
         etapes.append(CONVERSION_HDR)
     if infos.ips and infos.ips > IPS_MAX + 0.5:
@@ -89,14 +102,18 @@ def _filtre_commun(infos: InfosVideo) -> str:
     return ",".join(etapes)
 
 
-def produire_videos(entree: Entree, racine: Path, prefixe: str, *, son: bool, infos: InfosVideo | None = None) -> ResultatVideo:
-    """Écrit `<racine>/<prefixe>-video_720.mp4` (et 1080) et renvoie leurs infos."""
+def produire_videos(
+    entree: Entree, racine: Path, prefixe: str, *, son: bool, infos: InfosVideo | None = None, rotation: int = 0
+) -> ResultatVideo:
+    """Écrit `<racine>/<prefixe>-video_720.mp4` (et 1080) et renvoie leurs infos.
+
+    `rotation` : correction manuelle du média (sens horaire)."""
     infos = infos or infos_video(sonder(entree))
-    plan = plan_tailles(infos.largeur, infos.hauteur)
+    plan = plan_tailles(*dimensions_tournees(infos.largeur, infos.hauteur, rotation))
     (racine / prefixe).parent.mkdir(parents=True, exist_ok=True)
 
     etiquettes = [f"v{i}" for i in range(len(plan))]
-    graphe = f"[0:v:0]{_filtre_commun(infos)},split={len(plan)}" + "".join(f"[s{i}]" for i in range(len(plan)))
+    graphe = f"[0:v:0]{_filtre_commun(infos, rotation)},split={len(plan)}" + "".join(f"[s{i}]" for i in range(len(plan)))
     for i, (_, largeur, hauteur) in enumerate(plan):
         graphe += f";[s{i}]scale={largeur}:{hauteur}:flags=lanczos,setsar=1[{etiquettes[i]}]"
 
@@ -144,7 +161,7 @@ def image_apercu(entree: Entree, infos: InfosVideo) -> bytes:
     return png
 
 
-def produire_apercu(entree: Entree, racine: Path, prefixe: str, infos: InfosVideo) -> ResultatRendu:
+def produire_apercu(entree: Entree, racine: Path, prefixe: str, infos: InfosVideo, rotation: int = 0) -> ResultatRendu:
     """Poster d'une vidéo : WebP en trois tailles, couleur et ThumbHash, par la
     chaîne des photos (`rendus.produire_rendus`). Le PNG reste en mémoire."""
-    return produire_rendus(image_apercu(entree, infos), racine, prefixe)
+    return produire_rendus(image_apercu(entree, infos), racine, prefixe, rotation)

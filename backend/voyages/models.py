@@ -57,6 +57,9 @@ class Jour(models.Model):
         return f"{self.voyage} — {self.date}"
 
 
+ROTATIONS = [(0, "aucune"), (90, "¼ de tour à droite"), (180, "demi-tour"), (270, "¼ de tour à gauche")]
+
+
 class Source(models.TextChoices):
     """D'où vient une date ou une position. Une valeur « manuel » n'est jamais
     écrasée par un nouvel import."""
@@ -108,6 +111,13 @@ class Photo(models.Model):
     # vide pour une photo à la racine du dossier du voyage.
     photographe = models.CharField("photographe", max_length=100, blank=True)
     orientation = models.PositiveSmallIntegerField("orientation", null=True, blank=True)
+    # Correction saisie à la main (photo prise téléphone retourné), en degrés
+    # dans le sens horaire, appliquée APRÈS l'orientation EXIF. L'import ne la
+    # lit ni ne l'écrit : elle n'est jamais écrasée. Les originaux ne sont pas touchés.
+    rotation = models.PositiveSmallIntegerField(
+        "rotation", choices=ROTATIONS, default=0,
+        help_text="Correction appliquée aux rendus (l'original Nextcloud n'est pas modifié).",
+    )
     legende = models.TextField("légende", blank=True)
     # Position dans le jour (1, 2, 3…), réglée par glisser-déposer dans l'admin.
     ordre = models.IntegerField("ordre", default=0)

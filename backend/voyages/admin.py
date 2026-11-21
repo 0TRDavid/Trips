@@ -34,6 +34,7 @@ from django.utils.safestring import mark_safe
 from django.utils.http import urlencode
 
 from . import admin_completion
+from .generation import cle_rendus
 from .markdown import rendre_markdown
 from .models import Jour, Photo, Voyage
 from .widgets import ChoixCouverture, EditeurMarkdown, url_miniature
@@ -88,6 +89,44 @@ def _action_regenerer(modeladmin, request, photos):
 @admin.action(description="Régénérer les rendus des photos sélectionnées")
 def regenerer_photos(modeladmin, request, queryset):
     _action_regenerer(modeladmin, request, Photo.objects.filter(id__in=queryset.values("id")))
+
+
+def tourner_photos(photos, quart_de_tours: int) -> list[int]:
+    """Ajoute la rotation à chaque média (modulo 360) ; renvoie les ids modifiés."""
+    ids = []
+    for photo in photos:
+        photo.rotation = (photo.rotation + 90 * quart_de_tours) % 360
+        photo.save(update_fields=["rotation"])
+        ids.append(photo.id)
+    return ids
+
+
+def apres_rotation(modeladmin, request, ids: list[int]):
+    """Nouveaux rendus (photo et vidéo) et sidecar XMP, en arrière-plan."""
+    if not ids:
+        return
+    lancer_regeneration(ids)
+    admin_completion.lancer_export_xmp(ids)
+    modeladmin.message_user(
+        request,
+        f"Rotation enregistrée pour {len(ids)} média{'s' if len(ids) > 1 else ''} ; nouveaux rendus en cours "
+        "de génération (quelques secondes par photo, suivi : docker compose logs -f backend).",
+        messages.SUCCESS,
+    )
+
+
+def _action_tourner(quart_de_tours: int, description: str):
+    @admin.action(description=description)
+    def action(modeladmin, request, queryset):
+        apres_rotation(modeladmin, request, tourner_photos(queryset, quart_de_tours))
+
+    action.__name__ = f"tourner_{quart_de_tours}"
+    return action
+
+
+tourner_droite = _action_tourner(1, "Tourner d'¼ de tour à droite ↻")
+tourner_gauche = _action_tourner(3, "Tourner d'¼ de tour à gauche ↺")
+demi_tour = _action_tourner(2, "Retourner (demi-tour)")
 
 
 @admin.action(description="Régénérer les rendus des jours sélectionnés")
@@ -378,14 +417,14 @@ class PhotoAdmin(admin.ModelAdmin):
     list_editable = ["favori", "visible"]
     list_filter = [
         "jour__voyage", "type", "photographe", "visible", "favori", "source_date", "date_a_confirmer",
-        "source_position", "appareil",
+        "source_position", "appareil", "rotation",
     ]
     list_select_related = ["jour__voyage"]
     search_fields = ["legende", "chemin_nextcloud"]
     date_hierarchy = "prise_le"
     list_per_page = 50
     fields = [
-        "apercu_grand", "apercu_video", "legende", ("favori", "visible"), ("type", "duree"), "jour", "prise_le",
+        "apercu_grand", "apercu_video", "rotation", "legende", ("favori", "visible"), ("type", "duree"), "jour", "prise_le",
         ("source_date", "date_a_confirmer"), ("latitude", "longitude", "source_position"),
         "photographe", "appareil", ("largeur", "hauteur", "couleur"), "chemin_nextcloud",
     ]
@@ -394,7 +433,7 @@ class PhotoAdmin(admin.ModelAdmin):
         "largeur", "hauteur", "couleur", "chemin_nextcloud",
         "source_date", "date_a_confirmer", "latitude", "longitude", "source_position",
     ]
-    actions = [regenerer_photos]
+    actions = [tourner_droite, tourner_gauche, demi_tour, regenerer_photos]
     change_list_template = "admin/voyages/photo/change_list.html"
 
     def has_add_permission(self, request):
@@ -402,6 +441,11 @@ class PhotoAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         return [*admin_completion.urls(self.admin_site), *super().get_urls()]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if "rotation" in form.changed_data:
+            apres_rotation(self, request, [obj.id])
 
     def has_delete_permission(self, request, obj=None):
         return False  # une photo disparue de Nextcloud est signalée par l'import, pas supprimée ici
@@ -436,8 +480,8 @@ class PhotoAdmin(admin.ModelAdmin):
 
     @admin.display(description="rendus à jour", boolean=True)
     def rendus_a_jour(self, photo):
-        images = bool(photo.rendus_etag) and photo.rendus_etag == photo.etag
-        videos = photo.type == Photo.Type.PHOTO or photo.videos_etag == photo.etag
+        images = bool(photo.rendus_etag) and photo.rendus_etag == cle_rendus(photo)
+        videos = photo.type == Photo.Type.PHOTO or photo.videos_etag == cle_rendus(photo)
         return images and videos
 
     class Media:

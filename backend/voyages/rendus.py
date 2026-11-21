@@ -109,9 +109,26 @@ def couleur_dominante(image: Image.Image) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-def produire_rendus(octets: bytes, racine: Path, prefixe: str) -> ResultatRendu:
-    """Écrit les trois rendus `<racine>/<prefixe>-<taille>.webp` et renvoie leurs infos."""
-    image = decoder(octets)
+# Rotation manuelle (degrés, sens horaire) → transposition sans perte.
+_TRANSPOSITIONS = {
+    90: Image.Transpose.ROTATE_270,  # Pillow tourne dans le sens trigonométrique
+    180: Image.Transpose.ROTATE_180,
+    270: Image.Transpose.ROTATE_90,
+}
+
+
+def tourner(image: Image.Image, rotation: int) -> Image.Image:
+    """Applique la rotation manuelle d'un média (0, 90, 180, 270 ; sens horaire)."""
+    if rotation % 360 == 0:
+        return image
+    return image.transpose(_TRANSPOSITIONS[rotation % 360])
+
+
+def produire_rendus(octets: bytes, racine: Path, prefixe: str, rotation: int = 0) -> ResultatRendu:
+    """Écrit les trois rendus `<racine>/<prefixe>-<taille>.webp` et renvoie leurs infos.
+
+    `rotation` : correction manuelle, appliquée après l'orientation EXIF."""
+    image = tourner(decoder(octets), rotation)
     resultat = ResultatRendu(
         largeur=image.width,
         hauteur=image.height,

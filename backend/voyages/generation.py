@@ -5,7 +5,8 @@ Deux pistes, régénérées indépendamment :
   photo animée est son image fixe ;
 - vidéos (MP4) : la vidéo, ou la vidéo embarquée d'une photo animée.
 
-Relançable : une piste dont les rendus correspondent à l'etag courant, et dont
+Relançable : une piste dont les rendus correspondent à la clé courante
+(`cle_rendus` : l'etag, plus la rotation manuelle s'il y en a une), et dont
 les fichiers sont bien sur disque, n'est ni retéléchargée ni retraitée. Une
 photo déjà rendue qui se révèle animée ne reçoit que ses vidéos.
 
@@ -52,9 +53,10 @@ class RapportRendus:
 class _Tache:
     photo_id: int
     chemin: str
-    etag: str
+    etag: str  # clé des rendus (cle_rendus) : etag de l'original + rotation
     racine: Path
     type: str = Photo.Type.PHOTO
+    rotation: int = 0  # correction manuelle, degrés sens horaire
     images: bool = True  # (re)générer les WebP
     videos: bool = False  # (re)générer les MP4
 
@@ -69,13 +71,19 @@ def racine_cache() -> Path:
     return Path(settings.MEDIA_ROOT)
 
 
+def cle_rendus(photo: Photo) -> str:
+    """Ce dont dépendent les rendus : l'original (etag) et la rotation manuelle.
+    Sans rotation, la clé est l'etag seul (les rendus existants restent valides)."""
+    return f"{photo.etag}-r{photo.rotation}" if photo.rotation else photo.etag
+
+
 def a_des_videos(photo: Photo) -> bool:
     return photo.type in (Photo.Type.ANIMEE, Photo.Type.VIDEO)
 
 
 def images_a_jour(photo: Photo, racine: Path) -> bool:
     """Vrai si les trois WebP correspondent à l'etag courant et existent sur disque."""
-    if not photo.rendus_etag or photo.rendus_etag != photo.etag:
+    if not photo.rendus_etag or photo.rendus_etag != cle_rendus(photo):
         return False
     rendus = [r for r in photo.rendus.all() if r.taille in TAILLES]
     if {r.taille for r in rendus} != set(TAILLES):
@@ -88,7 +96,7 @@ def videos_a_jour(photo: Photo, racine: Path) -> bool:
     selon la source) correspondent à l'etag courant et existent sur disque."""
     if not a_des_videos(photo):
         return True
-    if not photo.videos_etag or photo.videos_etag != photo.etag:
+    if not photo.videos_etag or photo.videos_etag != cle_rendus(photo):
         return False
     rendus = [r for r in photo.rendus.all() if r.taille in TAILLES_VIDEO]
     return bool(rendus) and all((racine / r.fichier).is_file() for r in rendus)
@@ -139,7 +147,7 @@ def generer_rendus(
     photos = {p.id: p for p in a_faire}
     taches = [
         _Tache(
-            p.id, p.chemin_nextcloud, p.etag, racine, p.type,
+            p.id, p.chemin_nextcloud, cle_rendus(p), racine, p.type, p.rotation,
             images=force or not images_a_jour(p, racine),
             videos=a_des_videos(p) and (force or not videos_a_jour(p, racine)),
         )
@@ -192,20 +200,22 @@ def _traiter(tache: _Tache) -> tuple[_Tache, _Resultat | None, str | None]:
             with _client.entree_video(tache.chemin) as entree:
                 infos = infos_video(sonder(entree))
                 if tache.images:
-                    resultat.images = produire_apercu(entree, tache.racine, prefixe, infos)
+                    resultat.images = produire_apercu(entree, tache.racine, prefixe, infos, tache.rotation)
                 if tache.videos:
-                    resultat.videos = produire_videos(entree, tache.racine, prefixe, son=True, infos=infos)
+                    resultat.videos = produire_videos(
+                        entree, tache.racine, prefixe, son=True, infos=infos, rotation=tache.rotation
+                    )
         else:
             octets = _client.telecharger(tache.chemin)
             if tache.images:
-                resultat.images = produire_rendus(octets, tache.racine, prefixe)
+                resultat.images = produire_rendus(octets, tache.racine, prefixe, tache.rotation)
             if tache.videos:
                 position = video_embarquee(octets)
                 if position is None:
                     raise ValueError("vidéo embarquée introuvable")
                 # Photo animée : sans le son, comme sur le téléphone.
                 with entree_memoire(octets[position]) as entree:
-                    resultat.videos = produire_videos(entree, tache.racine, prefixe, son=False)
+                    resultat.videos = produire_videos(entree, tache.racine, prefixe, son=False, rotation=tache.rotation)
     except Exception as exc:  # un média abîmé ne doit pas arrêter les autres
         return tache, None, f"{type(exc).__name__} : {exc}"
     return tache, resultat, None
