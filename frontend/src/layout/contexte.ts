@@ -1,6 +1,7 @@
-import { createContext, useContext, useLayoutEffect } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
 import type { Palette } from "../api/types";
 import type { Navigation } from "../lib/mouvement";
+import { dureeDe, volVoyage } from "../lib/mouvement";
 
 /**
  * Dernière navigation entre pages (genre et sens), calculée par le Layout.
@@ -23,4 +24,24 @@ export function usePalette(palette: Palette | null | undefined) {
   useLayoutEffect(() => {
     definir(palette ?? null);
   }, [definir, palette]);
+}
+
+/**
+ * Faux tant que l'élément partagé de la page « vole » encore (accueil →
+ * voyage), vrai ensuite ou tout de suite s'il n'y a pas de vol. Sert à
+ * différer ce qui est lourd à monter (la carte MapLibre) : monter pendant
+ * le vol bloquerait le fil principal et ferait saccader la page.
+ */
+export function useApresVol(): boolean {
+  const nav = useNavigationPage();
+  const attente = nav.genre === "voyage" && nav.sens === 1 ? dureeDe(volVoyage(1)) : 0;
+  const [pret, setPret] = useState(attente === 0);
+  useEffect(() => {
+    if (pret) return;
+    const minuterie = setTimeout(() => setPret(true), attente * 1000 + 50);
+    return () => clearTimeout(minuterie);
+    // Au montage seulement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return pret;
 }

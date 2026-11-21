@@ -5,7 +5,7 @@ import Apparition from "../composants/Apparition";
 import EnteteVoyage from "../composants/EnteteVoyage";
 import Recit from "../composants/Recit";
 import TimelineJours from "../composants/TimelineJours";
-import { usePalette } from "../layout/contexte";
+import { useApresVol, usePalette } from "../layout/contexte";
 import { EtatChargement, EtatErreur } from "../layout/Etats";
 import { dateCourte } from "../lib/dates";
 import styles from "./VoyagePage.module.css";
@@ -18,6 +18,9 @@ export default function VoyagePage() {
   const { slug = "" } = useParams();
   const { data: voyage, error, refetch, isPending, isPlaceholderData } = useVoyage(slug);
   usePalette(voyage?.palette);
+  // La carte (la plus lourde à monter) attend que la couverture ait fini de
+  // voler depuis l'accueil ; sa place est déjà réservée, rien ne bouge.
+  const carteAutorisee = useApresVol();
   // Jour sélectionné (zoom de la carte). État d'écran éphémère, pas dans
   // l'URL : le retour arrière ramène à la page précédente, pas au zoom d'avant.
   const [selection, setSelection] = useState<string | null>(null);
@@ -61,6 +64,7 @@ export default function VoyagePage() {
         <div className={styles.zoneCarte}>
           {voyage.trace.length > 0 ? (
             <>
+              {carteAutorisee && (
               <Suspense fallback={null}>
                 <CarteParcours
                   trace={voyage.trace}
@@ -68,6 +72,7 @@ export default function VoyagePage() {
                   surSelection={selectionDepuisCarte}
                 />
               </Suspense>
+              )}
               <div className={styles.etiquette} aria-live="polite">
                 {selection ? (
                   <>

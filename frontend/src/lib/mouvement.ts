@@ -4,8 +4,9 @@
 //   - une sortie est plus rapide que l'entrée correspondante (facteurSortie) ;
 //   - le sens d'un glissement suit le sens de la navigation (sens = 1 : on
 //     avance, -1 : on recule ; voir lib/navigation.ts) ;
-//   - on n'anime que transform (x, y, scale) et opacity : rien qui oblige le
-//     navigateur à recalculer la mise en page (test dans lib.test.ts) ;
+//   - on n'anime que transform et opacity, écrits tels quels (pas x / y) : rien
+//     qui oblige à recalculer la mise en page, et le navigateur joue
+//     l'animation hors du fil principal (test dans mouvement.test.ts) ;
 //   - « réduire les animations » : tout devient un simple fondu.
 //
 // En dev, la page /labo peut ralentir le temps et
@@ -164,6 +165,21 @@ export type Navigation = { genre: GenreNavigation; sens: Sens };
 const AUCUNE: Transition = { duration: 0 };
 
 /**
+ * Déplacement écrit en `transform` (et non avec x / y de Motion) : Motion
+ * confie alors l'animation au navigateur (Web Animations), qui la joue hors
+ * du fil principal. Indispensable : l'arrivée d'une page (carte, dizaines de
+ * photos) occupe le fil principal pendant plusieurs dizaines de ms, ce qui
+ * faisait saccader les animations calculées en JavaScript.
+ * Toujours la même forme `translate(X%, Ypx)`, pour que Motion sache
+ * interpoler entre deux étapes.
+ */
+export const decaler = (xPourcent: number, yPx = 0) => `translate(${xPourcent}%, ${yPx}px)`;
+const decalerPx = (xPx: number) => `translate(${xPx}px, 0px)`;
+/** À la fin d'une entrée, plus aucun transform : un transform résiduel ferait
+ *  du cadre le repère des éléments `position: fixed` (visionneuse). */
+const SANS_TRANSFORM = { transform: "none" };
+
+/**
  * Variantes Motion d'une page (initial → visible → sortie), selon la
  * navigation. Fonctions de `custom` : la page qui SORT reçoit la navigation
  * qui la remplace (AnimatePresence lui passe le `custom` le plus récent).
@@ -173,13 +189,13 @@ export const variantesPage: Variants = {
     const { genre, sens } = nav;
     if (genre === "aucune") return { opacity: 1 };
     if (genre === "fondu") return { opacity: 0 };
-    if (genre === "jour") return { opacity: 1, x: `${100 * sens}%` };
+    if (genre === "jour") return { opacity: 1, transform: decaler(100 * sens) };
     if (genre === "voyage") return { opacity: 0 };
-    return { opacity: 0, y: distance.montee * sens };
+    return { opacity: 0, transform: decaler(0, distance.montee * sens) };
   },
   visible: (nav: Navigation) => {
     const { genre } = nav;
-    const fin = { opacity: 1, x: 0, y: 0 };
+    const fin = { opacity: 1, transform: decaler(0, 0), transitionEnd: SANS_TRANSFORM };
     if (genre === "aucune") return { ...fin, transition: AUCUNE };
     if (genre === "fondu") return { ...fin, transition: fondu() };
     if (genre === "jour") return { ...fin, transition: entree(duree.lente) };
@@ -204,10 +220,10 @@ export const variantesPage: Variants = {
     if (genre === "jour") {
       // L'ancienne page part d'un bloc de l'autre côté ; plus vite que la
       // nouvelle n'arrive, mais en décélérant pour ne pas sembler « tomber ».
-      return { x: `${-100 * sens}%`, transition: { ...sortie(duree.lente), ease: courbe.entree } };
+      return { transform: decaler(-100 * sens), transition: { ...sortie(duree.lente), ease: courbe.entree } };
     }
     if (genre === "voyage") return { opacity: 0, transition: sortie(duree.rapide) };
-    return { opacity: 0, y: (-distance.montee / 2) * sens, transition: sortie(duree.normale) };
+    return { opacity: 0, transform: decaler(0, (-distance.montee / 2) * sens), transition: sortie(duree.normale) };
   },
 };
 
@@ -215,8 +231,8 @@ export const variantesPage: Variants = {
 export function variantesBloc(reduit: boolean): Variants {
   if (reduit) return { initial: { opacity: 0 }, visible: () => ({ opacity: 1, transition: fondu() }) };
   return {
-    initial: { opacity: 0, y: distance.cascade },
-    visible: () => ({ opacity: 1, y: 0, transition: entree(duree.normale) }),
+    initial: { opacity: 0, transform: decaler(0, distance.cascade) },
+    visible: () => ({ opacity: 1, transform: decaler(0, 0), transitionEnd: SANS_TRANSFORM, transition: entree(duree.normale) }),
   };
 }
 
@@ -242,9 +258,13 @@ export function variantesPhotoVoisine(reduit: boolean): Variants {
     };
   }
   return {
-    initial: (sens: Sens) => ({ opacity: 0, x: distance.glissement * sens }),
-    visible: () => ({ opacity: 1, x: 0, transition: entree(duree.normale) }),
-    sortie: (sens: Sens) => ({ opacity: 0, x: (-distance.glissement / 2) * sens, transition: sortie(duree.normale) }),
+    initial: (sens: Sens) => ({ opacity: 0, transform: decalerPx(distance.glissement * sens) }),
+    visible: () => ({ opacity: 1, transform: decalerPx(0), transitionEnd: SANS_TRANSFORM, transition: entree(duree.normale) }),
+    sortie: (sens: Sens) => ({
+      opacity: 0,
+      transform: decalerPx((-distance.glissement / 2) * sens),
+      transition: sortie(duree.normale),
+    }),
   };
 }
 
