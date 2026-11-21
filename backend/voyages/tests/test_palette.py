@@ -8,7 +8,7 @@ from django.test import SimpleTestCase, TestCase
 from PIL import Image, ImageDraw
 
 from voyages.models import Photo, Rendu
-from voyages.palette import AA, Oklch, contraste, couleurs_vives, palette
+from voyages.palette import AA, TEXTES_NEUTRES, Oklch, contraste, couleurs_vives, palette
 
 from .donnees import creer_photo, creer_voyage
 from .fabrique import CacheTemporaire
@@ -74,11 +74,16 @@ class CouleursVivesTests(SimpleTestCase):
 
 
 class PaletteTests(SimpleTestCase):
-    CLES = {"accent", "accent_texte", "sur_accent", "fond", "fond_2", "degrade"}
+    CLES = {"accent", "accent_texte", "sur_accent", "fond", "fond_2", "degrade", "halos"}
 
     def verifier_contrastes(self, p):
-        for texte, fond in ((p["accent_texte"], p["fond"]), (p["accent_texte"], p["fond_2"]),
-                            (p["sur_accent"], p["accent"]), ("#1d1b18", p["fond"]), ("#1d1b18", p["fond_2"])):
+        self.assertEqual(len(p["halos"]), 3)
+        paires = [(p["sur_accent"], p["accent"])]
+        # Tout texte peut se trouver sur un fond, un fond 2 ou un halo.
+        for fond in (p["fond"], p["fond_2"], *p["halos"]):
+            for texte in (p["accent_texte"], *TEXTES_NEUTRES):
+                paires.append((texte, fond))
+        for texte, fond in paires:
             self.assertGreaterEqual(contraste(texte, fond), AA, f"{texte} sur {fond}")
 
     def test_accent_de_la_teinte_dominante_et_degrade_varie(self):

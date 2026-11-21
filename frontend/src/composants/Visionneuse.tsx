@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { AnimatePresence, animate, motion, usePresence } from "motion/react";
 import type { PhotoJour } from "../api/types";
 import { useGlissement } from "../hooks/useGlissement";
@@ -8,7 +8,7 @@ import { useTouchesClavier } from "../hooks/useTouchesClavier";
 import { useVolEntrant } from "../hooks/useVolEntrant";
 import { dateCourte, heureLocale } from "../lib/dates";
 import type { Sens } from "../lib/mouvement";
-import { fondu, ressortDe, transitionFondVisionneuse, variante, variantesPhotoVoisine, volPhoto } from "../lib/mouvement";
+import { fondu, transitionFondVisionneuse, variantesPhotoVoisine, volPhoto } from "../lib/mouvement";
 import { consommerRetourDejaAnime } from "../lib/navigation";
 import { srcset } from "../lib/rendus";
 import { idPhoto } from "../lib/transitions";
@@ -30,9 +30,6 @@ type Props = {
   suivant: () => void;
   fermer: () => void;
 };
-
-/** Distance (px) au-delà de laquelle une photo tirée vers le bas ferme la visionneuse. */
-const SEUIL_TIRAGE = 110;
 
 /** Précharge une photo voisine avec les mêmes srcset/sizes que l'affichage. */
 function precharger(photo: PhotoJour | undefined) {
@@ -59,9 +56,7 @@ function miniature(id: string, racine: Element): HTMLElement | null {
  * - photo → photo : glissement court dans le sens du parcours ;
  * - fermeture (✕, Échap, retour du navigateur) : la photo regagne sa
  *   miniature, ramenée à l'écran juste avant. La page jour la garde montée
- *   le temps du mouvement (AnimatePresence, usePresence) ;
- * - variante C : tirer la photo vers le bas la réduit ; lâchée assez bas,
- *   elle ferme la visionneuse.
+ *   le temps du mouvement (AnimatePresence, usePresence).
  */
 export default function Visionneuse({ photos, index, date, depuisGalerie, precedent, suivant, fermer }: Props) {
   const photo = photos[index];
@@ -70,7 +65,6 @@ export default function Visionneuse({ photos, index, date, depuisGalerie, preced
   const boutonFermer = useRef<HTMLButtonElement>(null);
   const dialogue = useRef<HTMLDivElement>(null);
   const fond = useRef<HTMLDivElement>(null);
-  const scene = useRef<HTMLDivElement>(null);
   const mouvementReduit = useMouvementReduit();
   const [present, retirer] = usePresence();
   // « Réduire les animations » : une photo animée reste fixe ; le bouton
@@ -158,56 +152,6 @@ export default function Visionneuse({ photos, index, date, depuisGalerie, preced
     precharger(photos[index - 1]);
   }, [photos, index]);
 
-  // --- Tirer vers le bas pour fermer (variante C) ------------------------------
-  const tirage = useRef<{ id: number; x: number; y: number; engage: boolean; dy: number } | null>(null);
-  const tirable = variante("photo") === "C" && !mouvementReduit;
-  const elementTire = () =>
-    photo ? scene.current?.querySelector<HTMLElement>(`[data-tirage="${photo.id}"]`) ?? null : null;
-
-  const surTirage = {
-    onPointerDown: (e: ReactPointerEvent) => {
-      glissement.onPointerDown(e);
-      if (!tirable || !actif || e.pointerType === "mouse") return;
-      if ((e.target as Element).closest?.("[data-sans-glissement]")) return;
-      tirage.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engage: false, dy: 0 };
-    },
-    onPointerMove: (e: ReactPointerEvent) => {
-      const t = tirage.current;
-      if (!t || t.id !== e.pointerId) return;
-      const dx = e.clientX - t.x;
-      const dy = e.clientY - t.y;
-      if (!t.engage) {
-        if (dy > 12 && dy > Math.abs(dx) * 1.2) t.engage = true;
-        else if (Math.abs(dx) > 12 || dy < -12) tirage.current = null; // glissement horizontal ou vers le haut
-        return;
-      }
-      t.dy = Math.max(0, dy);
-      const el = elementTire();
-      if (el) el.style.transform = `translate(${dx * 0.4}px, ${t.dy}px) scale(${1 - Math.min(t.dy, 400) / 1400})`;
-      if (fond.current) fond.current.style.opacity = String(1 - Math.min(t.dy / 400, 0.7));
-    },
-    onPointerUp: (e: ReactPointerEvent) => {
-      glissement.onPointerUp(e);
-      const t = tirage.current;
-      tirage.current = null;
-      if (!t?.engage) return;
-      if (t.dy > SEUIL_TIRAGE) {
-        fermer(); // la fermeture part de la position actuelle de la photo
-        return;
-      }
-      const el = elementTire();
-      if (el) animate(el, { transform: "translate(0px, 0px) scale(1)" }, ressortDe("vif"));
-      if (fond.current) animate(fond.current, { opacity: 1 }, ressortDe("vif"));
-    },
-    onPointerCancel: (e: ReactPointerEvent) => {
-      glissement.onPointerCancel(e);
-      tirage.current = null;
-      const el = elementTire();
-      if (el) el.style.transform = "";
-      if (fond.current) fond.current.style.opacity = "";
-    },
-  };
-
   // Garde le focus clavier (Tab) à l'intérieur de la visionneuse.
   const pieger = (e: ReactKeyboardEvent) => {
     if (e.key !== "Tab" || !dialogue.current) return;
@@ -258,7 +202,7 @@ export default function Visionneuse({ photos, index, date, depuisGalerie, preced
         </button>
       </div>
 
-      <div ref={scene} className={styles.scene} {...surTirage}>
+      <div className={styles.scene} {...glissement}>
         <AnimatePresence initial={false} custom={sens}>
           <motion.div
             key={photo?.id ?? "introuvable"}
@@ -269,7 +213,6 @@ export default function Visionneuse({ photos, index, date, depuisGalerie, preced
             animate="visible"
             exit="sortie"
           >
-            <div className={styles.tirage} data-tirage={photo?.id}>
               {photo?.type === "video" ? (
                 <LecteurVideo photo={photo} alt={alt} transitionId={idPhoto(photo.id)} />
               ) : animee ? (
@@ -289,7 +232,6 @@ export default function Visionneuse({ photos, index, date, depuisGalerie, preced
               ) : (
                 <p className={styles.introuvable}>Cette photo n’existe pas dans ce jour.</p>
               )}
-            </div>
           </motion.div>
         </AnimatePresence>
         <div className={styles.fleches} data-chrome>

@@ -12,6 +12,7 @@ html {
   /* Réserve la place de la barre de défilement : la page ne se décale pas
      quand elle apparaît ou que la visionneuse bloque le défilement. */
   scrollbar-gutter: stable;
+  background: var(--fond-gouttiere, var(--papier));
 }
 
 body {
@@ -97,13 +98,3 @@ html.sans-defilement {
   will-change: transform;
 }
 
-.calque-vol-rideau {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100vw;
-  height: 100vh;
-  transform-origin: 0 0;
-  will-change: transform;
-  transition: opacity 0.2s linear;
-}

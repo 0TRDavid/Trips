@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useJour, useVoyage, useVoyages } from "../api/requetes";
 import { useTitre } from "../hooks/useTitre";
 import { chemins } from "../lib/chemins";
-import type { NomTransition, Reglages, Variante } from "../lib/mouvement";
+import type { Reglages, Variante } from "../lib/mouvement";
 import { REGLAGES_DEFAUT, VARIANTES, enregistrerReglages, reglages } from "../lib/mouvement";
 import { idPhoto, idVoyage } from "../lib/transitions";
 import styles from "./LaboPage.module.css";
@@ -30,10 +30,12 @@ const pilote = (f: HTMLIFrameElement | null) =>
 
 type Scenario = { depart: string; arrivee: string; etat?: unknown; montrer?: string };
 
+type NomTransition = "voyage" | "photo" | "jour" | "page";
+
 const NOMS: Record<NomTransition, string> = {
   voyage: "T1 · Carte du voyage → en-tête",
-  photo: "T2 · Miniature → plein écran",
-  jour: "T3 · Jour suivant / précédent",
+  photo: "T2 · Miniature → plein écran → retour",
+  jour: "T3 · Jour suivant, puis retour",
   page: "T4 · Autres pages (voyage ↔ jour)",
 };
 
@@ -53,6 +55,7 @@ export default function LaboPage() {
   const tel = useRef<HTMLIFrameElement>(null);
   const pc = useRef<HTMLIFrameElement>(null);
   const reglagesCourants = useRef(r);
+  const fond = r.variantes.fond;
 
   const changer = (nouveaux: Reglages) => {
     reglagesCourants.current = nouveaux;
@@ -107,19 +110,11 @@ export default function LaboPage() {
     await attendre(pause());
   }
 
-  async function lancer(nom: NomTransition, comparer = false) {
+  async function lancer(nom: NomTransition) {
     if (enCours) return;
     setEnCours(nom);
     try {
-      if (!comparer) return await allerRetour(nom);
-      const initiale = reglagesCourants.current.variantes[nom];
-      for (const v of ["A", "B", "C"] as Variante[]) {
-        if (!VARIANTES[nom][v]) continue;
-        changer({ ...reglagesCourants.current, variantes: { ...reglagesCourants.current.variantes, [nom]: v } });
-        setEnCours(`${nom}-${v}`);
-        await allerRetour(nom);
-      }
-      changer({ ...reglagesCourants.current, variantes: { ...reglagesCourants.current.variantes, [nom]: initiale } });
+      await allerRetour(nom);
     } finally {
       setEnCours(null);
     }
@@ -130,7 +125,7 @@ export default function LaboPage() {
       <aside className={styles.panneau}>
         <h1 className={styles.titre}>Labo des transitions</h1>
         <p className={styles.aide}>
-          Le vrai site tourne dans les cadres. Choisis une variante, puis rejoue : aller, puis retour du navigateur.
+          Le vrai site tourne dans les cadres. « Rejouer » fait l'aller, puis le retour du navigateur.
           Sur téléphone, ouvre aussi le site directement pour juger au doigt.
         </p>
 
@@ -155,44 +150,38 @@ export default function LaboPage() {
           </button>
         </div>
 
-        {(Object.keys(NOMS) as NomTransition[]).map((nom) => {
-          const variantes = (["A", "B", "C"] as Variante[]).filter((v) => VARIANTES[nom][v]);
-          const choisie = r.variantes[nom];
-          return (
-            <section key={nom} className={styles.transition} data-en-cours={enCours?.startsWith(nom) || undefined}>
-              <h2>{NOMS[nom]}</h2>
-              {variantes.length > 1 && (
-                <div className={styles.choix} role="radiogroup" aria-label={`Variante de ${NOMS[nom]}`}>
-                  {variantes.map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      role="radio"
-                      aria-checked={choisie === v}
-                      onClick={() => changer({ ...r, variantes: { ...r.variantes, [nom]: v } })}
-                    >
-                      {v}
-                      {REGLAGES_DEFAUT.variantes[nom] === v && " ★"}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <p className={styles.description}>{VARIANTES[nom][choisie]}</p>
-              <div className={styles.actions}>
-                <button type="button" disabled={!scenarios || !!enCours} onClick={() => lancer(nom)}>
-                  {enCours === nom ? "…" : "▶ Rejouer"}
-                </button>
-                {variantes.length > 1 && (
-                  <button type="button" disabled={!scenarios || !!enCours} onClick={() => lancer(nom, true)}>
-                    {enCours?.startsWith(`${nom}-`) ? `Variante ${enCours.slice(-1)}…` : "Comparer A → B → C"}
-                  </button>
-                )}
-              </div>
-            </section>
-          );
-        })}
+        <section className={styles.transition}>
+          <h2>Fond des pages</h2>
+          <div className={styles.choix} role="radiogroup" aria-label="Variante du fond">
+            {(["A", "B", "C"] as Variante[]).map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={fond === v}
+                onClick={() => changer({ ...r, variantes: { ...r.variantes, fond: v } })}
+              >
+                {v}
+                {REGLAGES_DEFAUT.variantes.fond === v && " ★"}
+              </button>
+            ))}
+          </div>
+          <p className={styles.description}>{VARIANTES.fond[fond]}</p>
+          <p className={styles.aide}>Appliqué tout de suite dans les cadres : navigue entre accueil, voyage et jours.</p>
+        </section>
+
+        {(Object.keys(NOMS) as NomTransition[]).map((nom) => (
+          <section key={nom} className={styles.transition} data-en-cours={enCours === nom || undefined}>
+            <h2>{NOMS[nom]}</h2>
+            <div className={styles.actions}>
+              <button type="button" disabled={!scenarios || !!enCours} onClick={() => lancer(nom)}>
+                {enCours === nom ? "…" : "▶ Rejouer"}
+              </button>
+            </div>
+          </section>
+        ))}
         {!scenarios && <p className={styles.aide}>Chargement du voyage (il faut au moins deux jours et une photo)…</p>}
-        <p className={styles.aide}>★ = valeur actuelle des tokens (lib/mouvement.ts).</p>
+        <p className={styles.aide}>★ = valeur par défaut (lib/mouvement.ts).</p>
       </aside>
 
       <div className={styles.ecrans}>

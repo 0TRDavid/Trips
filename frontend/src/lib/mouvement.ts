@@ -43,6 +43,9 @@ export const facteurSortie = 0.65;
 /** Distances, en px. */
 export const distance = { glissement: 40, montee: 12, cascade: 16 } as const;
 
+/** Dérive des halos du fond (variante B), en secondes : assez lent pour ne pas distraire. */
+export const dureeDerive = 28;
+
 /** Décalage entre deux blocs qui apparaissent en cascade, en secondes. */
 export const intervalleCascade = 0.06;
 
@@ -52,39 +55,28 @@ export const DUREE_REDUITE = 0.15;
 /** Publie les durées en variables CSS (`--duree-rapide`…) pour les petites transitions CSS (survol). */
 export function publierDureesCss(racine: HTMLElement = document.documentElement) {
   for (const [nom, d] of Object.entries(duree)) racine.style.setProperty(`--duree-${nom}`, `${d}s`);
+  racine.style.setProperty("--duree-derive", `${dureeDerive}s`);
 }
 
 // --- Variantes comparées dans /labo -----------------------------------------------
+// Transitions validées à l'œil le 21/11/2026 (ressort carte → en-tête, ressort
+// miniature ↔ plein écran, page entière entre deux jours) : elles n'ont plus
+// de variantes. Le labo sert maintenant à comparer les fonds.
 
-export type NomTransition = "voyage" | "photo" | "jour" | "page";
+export type NomReglage = "fond";
 export type Variante = "A" | "B" | "C";
 
 /** Libellés des variantes, pour le labo. `null` : variante inexistante. */
-export const VARIANTES: Record<NomTransition, Record<Variante, string | null>> = {
-  voyage: {
-    A: "Ressort doux : l'image grandit avec un léger rebond, la page monte en cascade",
-    B: "Cinéma : expo-out sans rebond, la page apparaît après l'atterrissage",
-    C: "Rideau : le fond teinté du voyage se déploie depuis la carte",
-  },
-  photo: {
-    A: "Ressort : ouverture souple, fermeture nerveuse",
-    B: "Expo : ouverture 0,38 s, fermeture 0,25 s, sans rebond",
-    C: "Expo + tirer vers le bas pour fermer (téléphone)",
-  },
-  jour: {
-    A: "Page entière : l'ancienne part sur le côté, la nouvelle arrive de l'autre",
-    B: "Glissement court : 40 px et fondu",
-    C: "Parallaxe : l'ancienne recule de 30 %, la nouvelle arrive par-dessus",
-  },
-  page: {
-    A: "Fondu et montée de 12 px",
-    B: null,
-    C: null,
+export const VARIANTES: Record<NomReglage, Record<Variante, string | null>> = {
+  fond: {
+    A: "Aurore : trois halos pastel des couleurs du jour, fixes",
+    B: "Aurore vivante : les halos dérivent très lentement",
+    C: "Aurore + grain de papier",
   },
 };
 
 export type Reglages = {
-  variantes: Record<NomTransition, Variante>;
+  variantes: Record<NomReglage, Variante>;
   /** Multiplicateur des durées (1 = normal, 4 = quatre fois plus lent). */
   ralenti: number;
   /** Simule `prefers-reduced-motion: reduce`. */
@@ -92,7 +84,7 @@ export type Reglages = {
 };
 
 export const REGLAGES_DEFAUT: Reglages = {
-  variantes: { voyage: "A", photo: "A", jour: "B", page: "A" },
+  variantes: { fond: "A" },
   ralenti: 1,
   reduit: false,
 };
@@ -144,7 +136,7 @@ export function enregistrerReglages(r: Reglages) {
   window.dispatchEvent(new Event(EVENEMENT_REGLAGES));
 }
 
-export const variante = (nom: NomTransition): Variante => reglages().variantes[nom];
+export const variante = (nom: NomReglage): Variante => reglages().variantes[nom];
 
 // --- Règles -----------------------------------------------------------------------
 
@@ -204,11 +196,7 @@ export const variantesPage: Variants = {
     const { genre, sens } = nav;
     if (genre === "aucune") return { opacity: 1 };
     if (genre === "fondu") return { opacity: 0 };
-    if (genre === "jour") {
-      const v = variante("jour");
-      if (v === "A" || v === "C") return { opacity: 1, x: `${100 * sens}%` };
-      return { opacity: 0, x: distance.glissement * sens };
-    }
+    if (genre === "jour") return { opacity: 1, x: `${100 * sens}%` };
     if (genre === "voyage") return { opacity: 0 };
     return { opacity: 0, y: distance.montee * sens };
   },
@@ -217,19 +205,14 @@ export const variantesPage: Variants = {
     const fin = { opacity: 1, x: 0, y: 0 };
     if (genre === "aucune") return { ...fin, transition: AUCUNE };
     if (genre === "fondu") return { ...fin, transition: fondu() };
-    if (genre === "jour") {
-      const v = variante("jour");
-      return { ...fin, transition: entree(v === "B" ? duree.normale : duree.lente) };
-    }
+    if (genre === "jour") return { ...fin, transition: entree(duree.lente) };
     if (genre === "voyage") {
-      // La page arrive vite ; ses blocs (<Apparition>) suivent en cascade, après
-      // l'atterrissage de l'image en variante B.
-      const apresVol = variante("voyage") === "B" ? dureeDe(volVoyage(1)) : duree.rapide;
+      // La page arrive vite ; ses blocs (<Apparition>) suivent en cascade.
       return {
         ...fin,
         transition: {
           ...entree(duree.rapide),
-          delayChildren: t(apresVol),
+          delayChildren: t(duree.rapide),
           staggerChildren: t(intervalleCascade),
         },
       };
@@ -242,10 +225,9 @@ export const variantesPage: Variants = {
     if (genre === "aucune") return { opacity: 0, transition: AUCUNE };
     if (genre === "fondu") return { opacity: 0, transition: fondu() };
     if (genre === "jour") {
-      const v = variante("jour");
-      if (v === "A") return { x: `${-100 * sens}%`, transition: { ...sortie(duree.lente), ease: courbe.entree } };
-      if (v === "C") return { x: `${-30 * sens}%`, opacity: 0.3, transition: sortie(duree.lente) };
-      return { opacity: 0, x: (-distance.glissement / 2) * sens, transition: sortie(duree.normale) };
+      // L'ancienne page part d'un bloc de l'autre côté ; plus vite que la
+      // nouvelle n'arrive, mais en décélérant pour ne pas sembler « tomber ».
+      return { x: `${-100 * sens}%`, transition: { ...sortie(duree.lente), ease: courbe.entree } };
     }
     if (genre === "voyage") return { opacity: 0, transition: sortie(duree.rapide) };
     return { opacity: 0, y: (-distance.montee / 2) * sens, transition: sortie(duree.normale) };
@@ -265,15 +247,12 @@ export function variantesBloc(reduit: boolean): Variants {
 
 /** Vol carte ↔ en-tête du voyage. `sens` 1 : vers l'en-tête ; -1 : retour à la carte. */
 export function volVoyage(sens: Sens): Transition {
-  const retour = sens === -1 ? facteurSortie : 1;
-  if (variante("voyage") === "B") return { duration: t(duree.lente * retour), ease: courbe.entree };
-  return ressortDe("partage", retour);
+  return ressortDe("partage", sens === -1 ? facteurSortie : 1);
 }
 
 /** Vol miniature ↔ plein écran. `sens` 1 : ouverture ; -1 : fermeture. */
 export function volPhoto(sens: Sens): Transition {
-  if (variante("photo") === "A") return sens === 1 ? ressortDe("partage") : ressortDe("vif");
-  return sens === 1 ? { duration: t(0.38), ease: courbe.entree } : { duration: t(0.25), ease: courbe.entree };
+  return sens === 1 ? ressortDe("partage") : ressortDe("vif");
 }
 
 /** Photo → photo dans la visionneuse : glissement court dans le sens de la navigation. */

@@ -11,8 +11,7 @@
     env(safe-area-inset-left);
 }
 
-/* Fond noir séparé : il s'efface pendant que la photo regagne sa miniature,
-   et s'éclaircit quand on tire la photo vers le bas. */
+/* Fond noir séparé : il s'efface pendant que la photo regagne sa miniature. */
 .fond {
   position: absolute;
   inset: 0;
@@ -79,11 +78,6 @@
   position: absolute;
   inset: 0;
   padding: 0 clamp(0px, 4vw, 4.5rem);
-}
-
-.tirage {
-  width: 100%;
-  height: 100%;
 }
 
 .fleches {

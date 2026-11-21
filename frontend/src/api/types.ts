@@ -57,6 +57,8 @@ export type Palette = {
   fond: string;
   fond_2: string;
   degrade: string[];
+  /** 3 pastels pour les halos du fond (tout texte y reste AA). */
+  halos: string[];
 };
 
 export type VoyageResume = {

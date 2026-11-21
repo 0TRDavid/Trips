@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Link, ScrollRestoration, useLocation, useOutlet } from "react-router";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
@@ -9,6 +9,7 @@ import { variantesPage } from "../lib/mouvement";
 import { consommerRetourDejaAnime, navigation } from "../lib/navigation";
 import { arreterVol } from "../lib/vol";
 import type { Palette } from "../api/types";
+import FondPage from "../composants/FondPage";
 import { variablesPalette } from "../lib/palette";
 import { ContexteNavigation, ContexteTeinte } from "./contexte";
 import styles from "./Layout.module.css";
@@ -86,6 +87,12 @@ function CadrePage({ nav, children }: { nav: Navigation; children: ReactNode }) 
   }
   // Palette de la page (voyage, jour), déclarée par la page via usePalette().
   const [palette, setPalette] = useState<Palette | null>(null);
+  // La gouttière de la barre de défilement (hors des pages) prend le fond de
+  // la page affichée, sinon une bande de papier neutre reste visible à droite.
+  useEffect(() => {
+    if (!present) return;
+    document.documentElement.style.setProperty("--fond-gouttiere", palette?.fond ?? "");
+  }, [present, palette]);
   const style: CSSProperties = {
     ...variablesPalette(palette),
     ...(fige.current && { position: "fixed", ...fige.current, zIndex: 0, pointerEvents: "none" }),
@@ -103,6 +110,7 @@ function CadrePage({ nav, children }: { nav: Navigation; children: ReactNode }) 
       exit="sortie"
       inert={!present || undefined}
     >
+      <FondPage />
       <ContexteTeinte.Provider value={setPalette}>{children}</ContexteTeinte.Provider>
     </motion.div>
   );

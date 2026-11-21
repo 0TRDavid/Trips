@@ -2,7 +2,7 @@ import { useLayoutEffect } from "react";
 import { lancerVol, trouverSource } from "../lib/vol";
 import type { Transition } from "motion/react";
 
-type Vol = { transition: Transition; rideau?: string };
+type Vol = { transition: Transition };
 
 /**
  * À l'arrivée d'un élément partagé (`data-transition-id`), le fait « voler »

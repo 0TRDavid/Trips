@@ -118,7 +118,10 @@ def contraste(a: str, b: str) -> float:
 
 
 AA = 4.5
-ENCRE = "#1d1b18"  # même valeur que --encre (tokens.css)
+ENCRE = "#1d1b18"  # mêmes valeurs que --encre, --encre-2, --encre-3 (tokens.css)
+ENCRE_2 = "#5d5850"
+ENCRE_3 = "#68625a"
+TEXTES_NEUTRES = [ENCRE, ENCRE_2, ENCRE_3]
 BLANC = "#ffffff"
 
 # --- 1. Couleurs vives d'une image -------------------------------------------
@@ -188,7 +191,9 @@ def palette(medias: Iterable[tuple[list[dict], float]]) -> dict:
     - `accent_texte` : la même, assez foncée pour du texte sur `fond` et `fond_2` ;
     - `sur_accent` : blanc ou encre, lisible sur `accent` ;
     - `fond`, `fond_2` : papier teinté de l'accent ;
-    - `degrade` : 2 ou 3 teintes distinctes du voyage ou du jour.
+    - `degrade` : 2 ou 3 teintes distinctes du voyage ou du jour ;
+    - `halos` : 3 teintes pastel pour les halos du fond, assez claires pour
+      que tout le texte (encres et `accent_texte`) y reste AA.
     """
     cases = [[0.0, 0.0, 0.0, 0.0] for _ in range(NB_CASES)]  # poids, ΣL, Σa, Σb (pondérés)
     for couleurs, poids in medias:
@@ -243,6 +248,14 @@ def palette(medias: Iterable[tuple[list[dict], float]]) -> dict:
         # Une seule teinte : dégradé de l'accent vers une version plus claire.
         degrade.append(_vif(Oklch(base.L + 0.15, base.C * 0.8, (h + 25) % 360), l_max=0.85).hex())
 
+    # Halos : les teintes du voyage en pastel ; s'il en manque, des voisines de
+    # l'accent (±40°) pour garder trois couleurs.
+    sources = teintes + [Oklch(base.L, base.C, (h + d) % 360) for d in (40, -40)]
+    halos = [
+        _ajuster(Oklch(0.9, min(0.11, max(0.07, t.C)), t.h).ramener(), [accent_texte.hex(), *TEXTES_NEUTRES], +1).hex()
+        for t in sources[:3]
+    ]
+
     return {
         "accent": accent.hex(),
         "accent_texte": accent_texte.hex(),
@@ -250,6 +263,7 @@ def palette(medias: Iterable[tuple[list[dict], float]]) -> dict:
         "fond": fond,
         "fond_2": fond_2,
         "degrade": degrade,
+        "halos": halos,
     }
 
 

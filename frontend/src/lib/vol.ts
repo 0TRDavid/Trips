@@ -91,8 +91,6 @@ type Options = {
   source: Element;
   cible: Element;
   transition: Transition;
-  /** Rideau (variante C du voyage) : couleur qui se déploie de la source à tout l'écran. */
-  rideau?: string;
   /** Appelé à la fin du mouvement (avant que le clone soit retiré). */
   atterri?: () => void;
   /** Appelé quand l'élément d'arrivée est révélé et le clone retiré. */
@@ -112,7 +110,7 @@ export function arreterVol() {
  * telle quelle et le clone est retiré, dès que l'image de la cible est
  * chargée (sinon on garderait l'aperçu flou une fraction de seconde).
  */
-export function lancerVol({ source, cible, transition, rideau, atterri, fin }: Options) {
+export function lancerVol({ source, cible, transition, atterri, fin }: Options) {
   arreterVol();
   const image = imageDe(source) ?? imageDe(cible);
   const depart = rectDe(source);
@@ -130,14 +128,6 @@ export function lancerVol({ source, cible, transition, rideau, atterri, fin }: O
   const calque = document.createElement("div");
   calque.setAttribute("aria-hidden", "true");
   calque.className = "calque-vol";
-
-  let voile: HTMLDivElement | null = null;
-  if (rideau) {
-    voile = document.createElement("div");
-    voile.className = "calque-vol-rideau";
-    voile.style.background = rideau;
-    calque.append(voile);
-  }
 
   const boite = document.createElement("div");
   boite.className = "calque-vol-boite";
@@ -169,11 +159,6 @@ export function lancerVol({ source, cible, transition, rideau, atterri, fin }: O
     const etat = etatVol(depart, arrivee, image.taille, p);
     boite.style.transform = etat.boite;
     img.style.transform = etat.image;
-    if (voile) {
-      const plein = { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
-      const r = { x: lerp(depart.x, plein.x, p), y: lerp(depart.y, plein.y, p), w: lerp(depart.w, plein.w, p), h: lerp(depart.h, plein.h, p) };
-      voile.style.transform = `translate(${r.x}px, ${r.y}px) scale(${r.w / plein.w}, ${r.h / plein.h})`;
-    }
   };
   appliquer(0);
 
@@ -204,7 +189,6 @@ export function lancerVol({ source, cible, transition, rideau, atterri, fin }: O
     atterrir();
     // L'arrivée est révélée sous le clone ; le clone part dès qu'elle est nette.
     masques.forEach((el, i) => (el.style.opacity = opacites[i]));
-    if (voile) voile.style.opacity = "0";
     if (arriveePrete(cible)) return terminer();
     const imgCible = cible.querySelector("img");
     imgCible?.addEventListener("load", () => requestAnimationFrame(terminer), { once: true });

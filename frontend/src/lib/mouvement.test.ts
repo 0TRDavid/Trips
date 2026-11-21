@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GenreNavigation, Navigation, NomTransition, Variante } from "./mouvement";
+import type { GenreNavigation, Navigation } from "./mouvement";
 import {
   REGLAGES_DEFAUT,
-  VARIANTES,
   enregistrerReglages,
   entree,
   sortie,
@@ -70,18 +69,8 @@ describe("règles du système de mouvement", () => {
   const genres: GenreNavigation[] = ["aucune", "fondu", "voyage", "jour", "page"];
   const resoudre = (v: unknown, custom: unknown) => (typeof v === "function" ? v(custom) : v) as Record<string, unknown>;
 
-  function toutesLesVariantes(test: (nom: NomTransition, v: Variante) => void) {
-    for (const nom of Object.keys(VARIANTES) as NomTransition[]) {
-      for (const v of ["A", "B", "C"] as Variante[]) {
-        if (!VARIANTES[nom][v]) continue;
-        enregistrerReglages({ ...REGLAGES_DEFAUT, variantes: { ...REGLAGES_DEFAUT.variantes, [nom]: v } });
-        test(nom, v);
-      }
-    }
-  }
-
-  it("n'anime que transform (x, y, scale) et opacity, dans toutes les variantes", () => {
-    toutesLesVariantes(() => {
+  it("n'anime que transform (x, y, scale) et opacity", () => {
+    {
       const ensembles = [
         ...genres.flatMap((genre) =>
           ([1, -1] as const).map((sens) => [variantesPage, { genre, sens } satisfies Navigation] as const),
@@ -94,14 +83,14 @@ describe("règles du système de mouvement", () => {
           for (const prop of Object.keys(resoudre(etape, custom))) expect(PERMISES).toContain(prop);
         }
       }
-    });
+    }
   });
 
   it("une sortie est plus rapide que l'entrée correspondante", () => {
     for (const d of [0.18, 0.32, 0.55]) {
       expect(sortie(d).duration!).toBeLessThan(entree(d).duration!);
     }
-    toutesLesVariantes(() => {
+    {
       const duree = (t: { visualDuration?: number; duration?: number }) => t.visualDuration ?? t.duration ?? 0;
       expect(duree(volVoyage(-1))).toBeLessThan(duree(volVoyage(1)));
       expect(duree(volPhoto(-1))).toBeLessThan(duree(volPhoto(1)));
@@ -111,17 +100,21 @@ describe("règles du système de mouvement", () => {
         const sortiePage = resoudre(variantesPage.sortie, nav).transition as { duration: number };
         expect(sortiePage.duration).toBeLessThan(entreePage.duration);
       }
-    });
+      const jour = (etape: "visible" | "sortie") =>
+        (resoudre(variantesPage[etape], { genre: "jour", sens: 1 }).transition as { duration: number }).duration;
+      expect(jour("sortie")).toBeLessThan(jour("visible"));
+    }
   });
 
   it("le glissement change de côté avec le sens de navigation", () => {
-    toutesLesVariantes((nom) => {
-      if (nom !== "jour") return;
+    {
       const x = (sens: 1 | -1) => resoudre(variantesPage.initial, { genre: "jour", sens }).x;
       const signe = (v: unknown) => Math.sign(typeof v === "string" ? parseFloat(v) : Number(v));
       expect(signe(x(1))).toBe(1);
       expect(signe(x(-1))).toBe(-1);
-    });
+      // L'ancienne page part du côté opposé.
+      expect(signe(resoudre(variantesPage.sortie, { genre: "jour", sens: 1 }).x)).toBe(-1);
+    }
   });
 
   it("mouvement réduit : un simple fondu, sans déplacement", () => {
