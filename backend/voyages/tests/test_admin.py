@@ -22,6 +22,15 @@ class AdminTests(TestCase):
         self.jour = self.voyage.jours.get(date=date(2025, 6, 2))
         self.client.force_login(get_user_model().objects.create_superuser("admin", password="x"))
 
+    def test_liens_entre_jour_et_medias(self):
+        photo = self.jour.photos.first()
+        url_jour = reverse("admin:voyages_jour_change", args=[self.jour.pk])
+        url_photo = reverse("admin:voyages_photo_change", args=[photo.pk])
+        # Fiche du jour → fiche de chaque média ; fiche et liste des médias → jour.
+        self.assertContains(self.client.get(url_jour), f'href="{url_photo}"')
+        self.assertContains(self.client.get(url_photo), f'href="{url_jour}"')
+        self.assertContains(self.client.get(reverse("admin:voyages_photo_changelist")), f'href="{url_jour}"')
+
     def formulaire_jour(self, **modifs):
         """Données POST du formulaire d'un jour, avec le formset des photos dans l'ordre actuel."""
         photos = list(self.jour.photos.order_by("ordre"))

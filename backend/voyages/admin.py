@@ -338,13 +338,19 @@ class PhotoEnLigne(SortableTabularInline):
 
     @admin.display(description="photo")
     def apercu(self, photo):
-        return miniature(photo)
+        # Clic sur la vignette : fiche du média (rotation, date, position…).
+        url = reverse("admin:voyages_photo_change", args=[photo.pk])
+        return format_html('<a href="{}" title="Ouvrir la fiche du média">{}</a>', url, miniature(photo))
 
     @admin.display(description="heure locale")
     def heure(self, photo):
         local = photo.prise_le.astimezone(ZoneInfo(photo.jour.voyage.fuseau_horaire))
         type_ = "" if photo.type == Photo.Type.PHOTO else f" · {photo.get_type_display()}"
-        return format_html("{}<br><small>{}{}</small>", local.strftime("%H:%M"), photo, type_)
+        url = reverse("admin:voyages_photo_change", args=[photo.pk])
+        return format_html(
+            '{}<br><small>{}{}</small><br><a href="{}">Modifier le média ✎</a>',
+            local.strftime("%H:%M"), photo, type_, url,
+        )
 
 
 class JourForm(forms.ModelForm):
@@ -412,7 +418,7 @@ class JourAdmin(SortableAdminBase, admin.ModelAdmin):
 
 @admin.register(Photo)
 class PhotoAdmin(admin.ModelAdmin):
-    list_display = ["apercu", "nom", "type", "jour", "prise_le", "photographe", "favori", "visible", "rendus_a_jour"]
+    list_display = ["apercu", "nom", "type", "lien_jour", "prise_le", "photographe", "favori", "visible", "rendus_a_jour"]
     list_display_links = ["apercu", "nom"]
     list_editable = ["favori", "visible"]
     list_filter = [
@@ -424,12 +430,13 @@ class PhotoAdmin(admin.ModelAdmin):
     date_hierarchy = "prise_le"
     list_per_page = 50
     fields = [
-        "apercu_grand", "apercu_video", "rotation", "legende", ("favori", "visible"), ("type", "duree"), "jour", "prise_le",
+        "lien_jour", "apercu_grand", "apercu_video", "rotation", "legende", ("favori", "visible"), ("type", "duree"),
+        "prise_le",
         ("source_date", "date_a_confirmer"), ("latitude", "longitude", "source_position"),
         "photographe", "appareil", ("largeur", "hauteur", "couleur"), "chemin_nextcloud",
     ]
     readonly_fields = [
-        "apercu_grand", "apercu_video", "type", "duree", "jour", "prise_le", "photographe", "appareil",
+        "lien_jour", "apercu_grand", "apercu_video", "type", "duree", "prise_le", "photographe", "appareil",
         "largeur", "hauteur", "couleur", "chemin_nextcloud",
         "source_date", "date_a_confirmer", "latitude", "longitude", "source_position",
     ]
@@ -473,6 +480,13 @@ class PhotoAdmin(admin.ModelAdmin):
             settings.MEDIA_URL + rendus[0].fichier,
             mark_safe(" muted loop autoplay") if animee else "",
         )
+
+    @admin.display(description="jour", ordering="jour__date")
+    def lien_jour(self, photo):
+        """Lien vers la journée du média (récit, ordre et légendes de tout le jour)."""
+        url = reverse("admin:voyages_jour_change", args=[photo.jour_id])
+        titre = f" · {photo.jour.titre}" if photo.jour.titre else ""
+        return format_html('<a href="{}">← {}{}</a>', url, photo.jour.date.strftime("%d/%m/%Y"), titre)
 
     @admin.display(description="fichier", ordering="chemin_nextcloud")
     def nom(self, photo):
