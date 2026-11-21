@@ -37,6 +37,7 @@ class Metadonnees:
     appareil: str = ""
     orientation: int | None = None
     duree: float | None = None  # vidéos seulement, en secondes
+    date_du_nom: bool = False  # date lue dans le nom du fichier (horloge « nom de fichier »)
 
 
 def extraire_metadonnees(

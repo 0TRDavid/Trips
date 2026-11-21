@@ -20,6 +20,9 @@ def auteur():
 def creer_photo(jour, n, *, heure=None, ordre=None, gps=None, **champs):
     """Photo n du jour, prise à 9 h + n heures (heure de Tokyo) si `heure` n'est pas donnée."""
     prise_le = heure or datetime.combine(jour.date, datetime.min.time(), tzinfo=timezone.utc) + timedelta(hours=n)
+    # Comme un import : date et position lues dans les métadonnées.
+    champs.setdefault("source_date", "exif")
+    champs.setdefault("source_position", "exif" if gps else "")
     photo = Photo.objects.create(
         jour=jour,
         chemin_nextcloud=f"{jour.voyage.dossier_nextcloud}/{jour.date}-{n:03d}.jpg",

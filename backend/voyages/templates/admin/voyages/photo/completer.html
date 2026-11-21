@@ -1,0 +1,87 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% comment %}
+Écran « Compléter les médias » : date et position des médias qui n'en ont pas.
+Le squelette est ici ; voyages/completer.js le remplit à partir des endpoints
+JSON de admin_completion.py. MapLibre est servi depuis static (pas de CDN).
+{% endcomment %}
+{% block extrastyle %}{{ block.super }}
+  <link rel="stylesheet" href="{% static 'voyages/maplibre/maplibre-gl.css' %}">
+  <link rel="stylesheet" href="{% static 'voyages/completer.css' %}">
+{% endblock %}
+{% block bodyclass %}{{ block.super }} ecran-completer{% endblock %}
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Accueil</a>
+    › <a href="{% url 'admin:voyages_photo_changelist' %}">Médias</a>
+    › Compléter dates et positions
+  </div>
+{% endblock %}
+{% block content %}
+{{ config|json_script:"config-completer" }}
+<div id="completer" class="cm"
+     data-csrf="{{ csrf_token }}"
+     data-maplibre="{% static 'voyages/maplibre/maplibre-gl.mjs' %}"
+     data-worker="{% static 'voyages/maplibre/maplibre-gl-worker.mjs' %}">
+
+  <div class="cm-barre">
+    <label class="cm-champ">Voyage <select id="cm-voyage"></select></label>
+    <div class="cm-filtres" id="cm-filtres" role="group" aria-label="Filtre"></div>
+    <div class="cm-barre-fin">
+      <span id="cm-selection" class="cm-compte"></span>
+      <button type="button" class="button" id="cm-tout">Tout sélectionner</button>
+      <button type="button" class="button" id="cm-aucun">Aucun</button>
+    </div>
+  </div>
+  <p class="cm-message" id="cm-message" role="status" aria-live="polite"></p>
+
+  <div class="cm-grille">
+    <section class="cm-liste" aria-label="Médias">
+      <p class="cm-aide">Clic : choisir · Ctrl+clic : ajouter · Maj+clic : plage</p>
+      <ul id="cm-medias" class="cm-medias"></ul>
+    </section>
+
+    <section class="cm-carte-zone" aria-label="Carte">
+      <form id="cm-recherche" class="cm-recherche" role="search">
+        <input type="search" id="cm-lieu" placeholder="Chercher un lieu, puis Entrée" autocomplete="off" aria-label="Chercher un lieu">
+        <button type="submit" class="button">Chercher</button>
+        <ul id="cm-resultats" class="cm-resultats" hidden></ul>
+      </form>
+      <div id="cm-carte" class="cm-carte"></div>
+      <p class="cm-aide cm-aide-carte">Clic sur la carte : placer la sélection · recherche : © OpenStreetMap (Nominatim)</p>
+    </section>
+
+    <section class="cm-outils" aria-label="Outils">
+      <div id="cm-apercu" class="cm-apercu"></div>
+
+      <form id="cm-date" class="cm-bloc">
+        <h3>Date et heure <small>(heure locale du voyage)</small></h3>
+        <div class="cm-ligne">
+          <input type="date" id="cm-date-jour" required aria-label="Date">
+          <input type="time" id="cm-date-heure" step="1" required aria-label="Heure">
+          <button type="submit" class="button default">Appliquer</button>
+        </div>
+        <p class="cm-aide">Pour un lot : le premier reçoit cette heure, les suivants une seconde de plus chacun.</p>
+        <button type="button" class="button" id="cm-confirmer" hidden>Confirmer la date proposée</button>
+      </form>
+
+      <div class="cm-bloc">
+        <h3><label for="cm-jour">Jour</label> <select id="cm-jour"></select></h3>
+        <p class="cm-aide">Cliquer <b>entre</b> deux médias pour y placer la sélection, ou <b>sur</b> un média pour le prendre comme référence.</p>
+        <ol id="cm-bande" class="cm-bande"></ol>
+        <p id="cm-bande-note" class="cm-aide"></p>
+        <div id="cm-reference" class="cm-reference" hidden>
+          <span id="cm-reference-texte"></span>
+          <span class="cm-ligne">
+            Reprendre :
+            <button type="button" class="button" data-reprendre="position">la position</button>
+            <button type="button" class="button" data-reprendre="heure">l'heure</button>
+            <button type="button" class="button" data-reprendre="tout">les deux</button>
+          </span>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<script type="module" src="{% static 'voyages/completer.js' %}"></script>
+{% endblock %}

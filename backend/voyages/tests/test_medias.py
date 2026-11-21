@@ -429,8 +429,10 @@ class ImportEtRendusMediasTests(CacheTemporaire, TestCase):
         whatsapp = Photo.objects.get(chemin_nextcloud__endswith="WA0010.mp4")
         self.assertFalse(whatsapp.visible)
         self.assertIn(whatsapp.chemin_nextcloud, rapport.sans_date)
-        # Rangée à la date du fichier (1er juin), elle n'étire pas les dates du voyage.
-        self.assertEqual(whatsapp.jour.date, date(2025, 6, 1))
+        # Rangée à la date proposée par son nom (à confirmer), masquée, elle
+        # n'étire pas les dates du voyage.
+        self.assertEqual(whatsapp.jour.date, date(2025, 6, 11))
+        self.assertTrue(whatsapp.date_a_confirmer)
         voyage = whatsapp.jour.voyage
         self.assertEqual((voyage.date_debut, voyage.date_fin), (date(2025, 4, 5), date(2025, 4, 5)))
 
