@@ -119,6 +119,9 @@ class Photo(models.Model):
     hauteur = models.PositiveIntegerField("hauteur", null=True, blank=True, help_text="Orientation appliquée")
     couleur = models.CharField("couleur", max_length=7, blank=True, help_text="Couleur dominante, #rrggbb")
     placeholder = models.CharField("placeholder", max_length=100, blank=True, help_text="ThumbHash en base64")
+    # Couleurs franches de l'image ([{"hex": "#c2185b", "part": 0.12}, …], voir
+    # voyages/palette.py) : les palettes des voyages et des jours en sont tirées.
+    couleurs = models.JSONField("couleurs vives", default=list, blank=True)
     # Etag de l'original pour lequel les rendus ont été générés (vide : à faire).
     rendus_etag = models.CharField("etag des rendus", max_length=200, blank=True)
     # Idem pour les rendus vidéo (photo animée, vidéo) : les deux pistes se

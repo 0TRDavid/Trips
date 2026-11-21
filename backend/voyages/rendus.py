@@ -21,6 +21,7 @@ from pathlib import Path
 import pillow_heif
 from PIL import Image, ImageCms, ImageOps
 
+from .palette import couleurs_vives
 from .thumbhash import thumbhash_image
 
 pillow_heif.register_heif_opener()
@@ -48,6 +49,7 @@ class ResultatRendu:
     hauteur: int
     couleur: str  # « #rrggbb »
     placeholder: str  # ThumbHash en base64
+    couleurs: list[dict] = field(default_factory=list)  # couleurs vives (palette.py)
     fichiers: list[FichierRendu] = field(default_factory=list)
 
 
@@ -115,6 +117,7 @@ def produire_rendus(octets: bytes, racine: Path, prefixe: str) -> ResultatRendu:
         hauteur=image.height,
         couleur=couleur_dominante(image),
         placeholder=thumbhash_image(image),
+        couleurs=couleurs_vives(image),
     )
     (racine / prefixe).parent.mkdir(parents=True, exist_ok=True)
 

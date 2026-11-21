@@ -260,8 +260,9 @@ def _enregistrer(photo: Photo, tache: _Tache, resultat: _Resultat, racine: Path)
             _remplacer(photo, TAILLES, images.fichiers, "webp")
             photo.largeur, photo.hauteur = images.largeur, images.hauteur
             photo.couleur, photo.placeholder = images.couleur, images.placeholder
+            photo.couleurs = images.couleurs
             photo.rendus_etag = tache.etag
-            champs += ["largeur", "hauteur", "couleur", "placeholder", "rendus_etag"]
+            champs += ["largeur", "hauteur", "couleur", "placeholder", "couleurs", "rendus_etag"]
         if resultat.videos is not None:
             _remplacer(photo, TAILLES_VIDEO, resultat.videos.fichiers, "mp4")
             photo.videos_etag = tache.etag
