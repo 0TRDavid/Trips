@@ -202,4 +202,5 @@ Constat avant de coder : la « couleur dominante » d'une photo est la couleur l
 - **Continuité entre les jours** : au bout de la journée, un cran de plus ouvre le jour suivant (le bas de page n'est plus un arrêt). Remonter au jour précédent par la molette : non fait (on arriverait sur sa couverture, pas sur sa fin).
 - Bug de revue « la barre ne réapparaît pas » : non reproduit dans Chromium ; cause probable, les IntersectionObserver sans racine mesurent la fenêtre principale dans les iframes du labo → `root: document`.
 - Téléphone inchangé (défilement libre), rangées agrandies à 150 px.
+- **Paysages seuls (revue : « pour les photos déjà en paysage, laisse-les seules, c'est bien mieux »)** : un paysage occupe un écran à lui seul ; il le remplit s'il y perd au plus 15 % (3:2, 16:9), sinon il est entier sur son flou (4:3 des téléphones, la majorité). Seuls les portraits vont par deux ; un portrait suivi d'un paysage ou dernier de son heure est seul. Le gabarit « l'une sur l'autre » disparaît (les panoramas sont seuls). Prix : plus d'écrans (5 juin : 78 pour 94 photos).
 

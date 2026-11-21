@@ -140,9 +140,9 @@ function Rangees({ slug, date, photos }: PropsRangees) {
 type Place = { largeur: number; ecran: number; haut: number };
 
 /**
- * Mosaïque plein écran (ordinateur) : deux photos par écran, bord à bord (côte à côte,
- * ou l'une sur l'autre pour des panoramas : lib/rangees.ts). Une photo seule
- * garde ses proportions, sur sa version floue.
+ * Mosaïque plein écran (ordinateur, lib/rangees.ts) : un paysage seul par
+ * écran (il le remplit, ou entier sur sa version floue), les portraits par
+ * deux, côte à côte, bord à bord.
  */
 function MosaiquePleinEcran({ slug, date, photos, place }: PropsRangees & { place: Place }) {
   const pages = useMemo(
@@ -151,11 +151,12 @@ function MosaiquePleinEcran({ slug, date, photos, place }: PropsRangees & { plac
   );
   return (
     <div className={styles.pages}>
-      {pages.map(({ gabarit, debut, cases }) => {
-        if (gabarit === "seule") {
-          // Photo seule : entière, sur sa version floue étirée aux côtés.
+      {pages.map((page) => {
+        const { debut, cases } = page;
+        if (page.gabarit === "seule") {
+          // Photo seule : remplit l'écran, ou entière sur sa version floue.
           const photo = photos[debut];
-          const fond = placeholderDataUrl(photo.placeholder);
+          const fond = page.couvrir ? null : placeholderDataUrl(photo.placeholder);
           return (
             <div key={debut} className={styles.pagePhoto} style={{ height: place.ecran }} data-ancre="">
               {fond && <div className={styles.fondFlou} style={{ backgroundImage: `url(${fond})` }} aria-hidden />}
@@ -164,10 +165,10 @@ function MosaiquePleinEcran({ slug, date, photos, place }: PropsRangees & { plac
                   slug={slug}
                   date={date}
                   photo={photo}
-                  sizes={`${Math.round(ratio(photo) * place.ecran)}px`}
+                  sizes={page.couvrir ? `${place.largeur}px` : `${Math.round(ratio(photo) * place.ecran)}px`}
                   className={styles.cellulePhoto}
                   style={{}}
-                  mode="contenir"
+                  mode={page.couvrir ? "couvrir" : "contenir"}
                 />
               </ul>
             </div>

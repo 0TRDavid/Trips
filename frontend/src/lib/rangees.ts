@@ -4,43 +4,45 @@ export function galeriePleinEcran(): boolean {
 }
 
 // --- Mosaïque plein écran (ordinateur) ---------------------------------------
-// Deux photos par écran, bord à bord : côte à côte, ou l'une au-dessus de
-// l'autre (panoramas), selon ce qui les rogne le moins (photos en
-// « couvrir »). Une photo seule (heure d'une seule photo, ou la dernière d'une
-// heure impaire) garde ses proportions : entière, sur sa version floue.
+// Une photo paysage occupe un écran à elle seule : elle le remplit si son
+// format est proche de celui de l'écran, sinon elle est entière sur sa version
+// floue. Les portraits vont par deux, côte à côte, bord à bord ; un portrait
+// sans voisin portrait (suivi d'un paysage, ou dernier de l'heure) est seul,
+// entier sur son flou.
 
 /** Case d'un gabarit, en fractions de l'écran. */
 export type Case = { x: number; y: number; l: number; h: number };
-export type PageMosaique = { gabarit: "seule" | "deux-colonnes" | "deux-lignes"; debut: number; cases: Case[] };
+export type PageMosaique =
+  | { gabarit: "seule"; debut: number; cases: Case[]; couvrir: boolean }
+  | { gabarit: "deux-colonnes"; debut: number; cases: Case[] };
 
-const GABARITS_PAIRE = {
-  "deux-colonnes": [
-    { x: 0, y: 0, l: 0.5, h: 1 },
-    { x: 0.5, y: 0, l: 0.5, h: 1 },
-  ],
-  "deux-lignes": [
-    { x: 0, y: 0, l: 1, h: 0.5 },
-    { x: 0, y: 0.5, l: 1, h: 0.5 },
-  ],
-} as const satisfies Record<string, Case[]>;
-
+const DEUX_COLONNES: Case[] = [
+  { x: 0, y: 0, l: 0.5, h: 1 },
+  { x: 0.5, y: 0, l: 0.5, h: 1 },
+];
 const SEULE: Case[] = [{ x: 0, y: 0, l: 1, h: 1 }];
+
+/** Une photo seule remplit l'écran si elle y perd au plus cette part d'elle-même. */
+const ROGNAGE_MAX_SEULE = 0.15;
 
 /** Part de la photo perdue quand elle couvre une case de ratio `rc`. */
 const rognage = (rp: number, rc: number) => 1 - Math.min(rp / rc, rc / rp);
+const paysage = (r: number) => r > 1;
 
 export function mosaiquePleinEcran(ratios: number[], largeur: number, hauteur: number): PageMosaique[] {
   const ecran = largeur / hauteur;
   const pages: PageMosaique[] = [];
-  for (let debut = 0; debut < ratios.length; debut += 2) {
-    if (debut + 1 >= ratios.length) {
-      pages.push({ gabarit: "seule", debut, cases: SEULE });
-      break;
+  let debut = 0;
+  while (debut < ratios.length) {
+    const r = ratios[debut];
+    const suivant = ratios[debut + 1];
+    if (!paysage(r) && suivant !== undefined && !paysage(suivant)) {
+      pages.push({ gabarit: "deux-colonnes", debut, cases: DEUX_COLONNES });
+      debut += 2;
+    } else {
+      pages.push({ gabarit: "seule", debut, cases: SEULE, couvrir: rognage(r, ecran) <= ROGNAGE_MAX_SEULE });
+      debut += 1;
     }
-    const perte = (cases: readonly Case[]) =>
-      cases.reduce((t, c, k) => t + rognage(ratios[debut + k], (c.l / c.h) * ecran), 0);
-    const gabarit = perte(GABARITS_PAIRE["deux-lignes"]) < perte(GABARITS_PAIRE["deux-colonnes"]) ? "deux-lignes" : "deux-colonnes";
-    pages.push({ gabarit, debut, cases: [...GABARITS_PAIRE[gabarit]] });
   }
   return pages;
 }
