@@ -61,6 +61,10 @@ export default function VoyagePage() {
 
       {!isPlaceholderData && (
       <Apparition className={styles.parcours}>
+        <section className={styles.colCarte} aria-labelledby="titre-carte">
+        <h2 id="titre-carte" className={styles.titreSection}>
+          Le parcours
+        </h2>
         <div className={styles.zoneCarte}>
           {voyage.trace.length > 0 ? (
             <>
@@ -93,11 +97,14 @@ export default function VoyagePage() {
             <p className={styles.sansCarte}>Aucune photo géolocalisée pour ce voyage.</p>
           )}
         </div>
+        </section>
 
         <section className={styles.jours} aria-labelledby="titre-jours">
-          <h2 id="titre-jours" className={styles.titreJours}>
+          <h2 id="titre-jours" className={styles.titreSection}>
             Jour après jour
           </h2>
+          {/* En variante E (ordinateur), seule cette liste défile : le titre reste. */}
+          <div className={styles.defilement}>
           <TimelineJours
             slug={voyage.slug}
             debut={voyage.date_debut}
@@ -106,6 +113,7 @@ export default function VoyagePage() {
             selection={selection}
             surSelection={selectionDepuisListe}
           />
+          </div>
         </section>
       </Apparition>
       )}

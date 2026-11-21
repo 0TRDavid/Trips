@@ -40,6 +40,13 @@
   --h-galerie-large: 320px; /* hauteur de rangée de la galerie, écran ≥ 1200 px */
   --ecart-colonnes: clamp(2rem, 4vw, 4rem); /* entre la carte et les jours (ordinateur) */
   --ecart-parcours: clamp(1.5rem, 4vw, 3rem); /* au-dessus de la carte */
+  --voyage-hauteur: auto; /* page voyage (ordinateur) : auto = elle défile */
+  --voyage-bas: 4rem;
+  --parcours-rangee: auto;
+  --parcours-flex: none;
+  --parcours-min: auto;
+  --jours-defilement: visible;
+  --carte-flex: none;
   --carte-haut: 1rem; /* carte du voyage collante (ordinateur) */
   --carte-hauteur: calc(100vh - 2rem);
   --carte-hauteur-max: 820px;

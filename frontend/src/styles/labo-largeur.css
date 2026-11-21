@@ -62,8 +62,16 @@ html[data-largeur="serre"] {
 
 @media (min-width: 900px) {
   html[data-largeur="serre"] {
-    --carte-haut: var(--marge);
-    --carte-hauteur: calc(100vh - 2 * var(--marge));
+    /* La page voyage tient dans l'écran : couverture + parcours ; seule la
+       liste des jours défile, sous son titre. */
+    --voyage-hauteur: calc(100svh - var(--hauteur-entete));
+    --voyage-bas: var(--marge);
+    --parcours-rangee: minmax(0, 1fr);
+    --parcours-flex: 1;
+    --parcours-min: 420px;
+    --jours-defilement: auto;
+    --carte-flex: 1;
+    --carte-hauteur: auto;
     --carte-hauteur-max: none;
   }
 }

@@ -1,5 +1,5 @@
 .page {
-  padding-bottom: 4rem;
+  padding-bottom: var(--voyage-bas);
 }
 
 .intro {
@@ -70,21 +70,72 @@
   text-align: center;
 }
 
-.titreJours {
+/* « Le parcours » et « Jour après jour » : même titre de section. */
+.titreSection {
   font-size: clamp(1.6rem, 4vw, 2.2rem);
   margin-bottom: 1rem;
 }
 
+/* Téléphone : la colonne de la carte s'efface (display: contents), pour que
+   la carte reste collante dans le parcours ; son titre défile avec la page. */
+.colCarte {
+  display: contents;
+}
+
+/* Le titre est alors un bloc du parcours : on retire l'espace entre blocs,
+   pour qu'il soit aussi près de la carte que « Jour après jour » de sa liste. */
+.colCarte > .titreSection {
+  margin-bottom: -0.5rem;
+}
+
 /* Ordinateur : carte collante à gauche, jours à droite. */
 @media (min-width: 900px) {
+  /* Variante E : la page tient dans l'écran (--voyage-hauteur), le parcours
+     prend la hauteur restante et seule la liste des jours défile. Sinon
+     (hauteur auto), la page défile et la carte reste collante. */
+  .page {
+    display: flex;
+    flex-direction: column;
+    height: var(--voyage-hauteur);
+  }
+
   .parcours {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-rows: var(--parcours-rangee);
     gap: var(--ecart-colonnes);
     align-items: start;
+    flex: var(--parcours-flex);
+    min-height: var(--parcours-min);
+  }
+
+  .colCarte > .titreSection {
+    margin-bottom: 1rem;
+  }
+
+  .colCarte {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    min-height: 0;
+  }
+
+  .jours {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    min-height: 0;
+  }
+
+  .defilement {
+    flex: 1;
+    min-height: 0;
+    overflow-y: var(--jours-defilement);
+    overscroll-behavior: contain;
   }
 
   .zoneCarte {
     top: var(--carte-haut);
+    flex: var(--carte-flex);
     height: var(--carte-hauteur);
     max-height: var(--carte-hauteur-max);
     margin: 0 0 0 calc(-1 * var(--debord-carte));
