@@ -75,9 +75,16 @@
   display: contents;
 }
 
-/* Récit d'introduction : en tête de la colonne de la carte. */
+/* Récit d'introduction : en tête de la colonne de la carte, sur toute sa
+   largeur (le récit est sinon limité à la largeur de lecture). */
 .intro {
   min-width: 0;
+  /* Téléphone : bloc du parcours (espacé de 1,5 rem) ; ramené à 0,75 rem de la carte. */
+  margin-bottom: -0.75rem;
+}
+
+.intro > * {
+  max-width: none;
 }
 
 /* Ordinateur : carte collante à gauche, jours à droite. */
@@ -103,7 +110,7 @@
   .colCarte {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.75rem;
     align-self: stretch;
     min-height: 0;
   }
@@ -111,6 +118,7 @@
   /* Un long récit défile dans sa zone ; la carte garde au moins 45 % de la
      colonne (variante E). La liste des jours, elle, ne rétrécit pas. */
   .intro {
+    margin-bottom: 0;
     flex: 0 1 auto;
     min-height: 0;
     overflow-y: var(--jours-defilement);
