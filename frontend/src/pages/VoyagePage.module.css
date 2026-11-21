@@ -1,5 +1,7 @@
+/* Téléphone : la liste s'arrête juste au-dessus du bas de l'écran (même
+   marge que sur les côtés, barre système des iPhone comprise). */
 .page {
-  padding-bottom: var(--voyage-bas);
+  padding-bottom: max(var(--marge), env(safe-area-inset-bottom));
 }
 
 .parcours {
@@ -93,6 +95,7 @@
      prend la hauteur restante et seule la liste des jours défile. Sinon
      (hauteur auto), la page défile et la carte reste collante. */
   .page {
+    padding-bottom: var(--voyage-bas);
     display: flex;
     flex-direction: column;
     height: var(--voyage-hauteur);
