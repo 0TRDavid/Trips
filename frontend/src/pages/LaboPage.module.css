@@ -63,12 +63,7 @@
   font-size: 1.1rem;
 }
 
-.choix {
-  display: flex;
-  gap: 0.4rem;
-}
 
-.choix button,
 .actions button,
 .globaux button {
   font-size: 0.9rem;
@@ -79,11 +74,6 @@
   cursor: pointer;
 }
 
-.choix button[aria-checked="true"] {
-  background: var(--accent-vif);
-  color: var(--sur-accent);
-  border-color: var(--accent-vif);
-}
 
 .actions {
   display: flex;
@@ -96,11 +86,6 @@
   cursor: default;
 }
 
-.description {
-  font-size: 0.9rem;
-  color: var(--encre-2);
-  min-height: 2.6em;
-}
 
 .ecrans {
   display: flex;

@@ -8,7 +8,7 @@
 //     navigateur à recalculer la mise en page (test dans lib.test.ts) ;
 //   - « réduire les animations » : tout devient un simple fondu.
 //
-// En dev, la page /labo peut surcharger les variantes, ralentir le temps et
+// En dev, la page /labo peut ralentir le temps et
 // simuler « réduire les animations » (réglages lus dans localStorage). En
 // prod, `import.meta.env.DEV` est faux : ce code disparaît du build.
 
@@ -43,9 +43,6 @@ export const facteurSortie = 0.65;
 /** Distances, en px. */
 export const distance = { glissement: 40, montee: 12, cascade: 16 } as const;
 
-/** Dérive des halos du fond (variante B), en secondes : assez lent pour ne pas distraire. */
-export const dureeDerive = 28;
-
 /** Décalage entre deux blocs qui apparaissent en cascade, en secondes. */
 export const intervalleCascade = 0.06;
 
@@ -55,39 +52,21 @@ export const DUREE_REDUITE = 0.15;
 /** Publie les durées en variables CSS (`--duree-rapide`…) pour les petites transitions CSS (survol). */
 export function publierDureesCss(racine: HTMLElement = document.documentElement) {
   for (const [nom, d] of Object.entries(duree)) racine.style.setProperty(`--duree-${nom}`, `${d}s`);
-  racine.style.setProperty("--duree-derive", `${dureeDerive}s`);
 }
 
-// --- Variantes comparées dans /labo -----------------------------------------------
-// Transitions validées à l'œil le 21/11/2026 (ressort carte → en-tête, ressort
-// miniature ↔ plein écran, page entière entre deux jours) : elles n'ont plus
-// de variantes. Le labo sert maintenant à comparer les fonds.
-
-export type NomReglage = "fond";
-export type Variante = "A" | "B" | "C";
-
-/** Libellés des variantes, pour le labo. `null` : variante inexistante. */
-export const VARIANTES: Record<NomReglage, Record<Variante, string | null>> = {
-  fond: {
-    A: "Aurore : trois halos pastel des couleurs du jour, fixes",
-    B: "Aurore vivante : les halos dérivent très lentement",
-    C: "Aurore + grain de papier",
-  },
-};
+// --- Réglages du labo -----------------------------------------------------------
+// Variantes validées à l'œil le 21/11/2026 : ressort carte → en-tête, ressort
+// miniature ↔ plein écran, page entière entre deux jours, fond en halos fixes.
+// Les autres ont été retirées ; le labo sert à rejouer et à ralentir.
 
 export type Reglages = {
-  variantes: Record<NomReglage, Variante>;
   /** Multiplicateur des durées (1 = normal, 4 = quatre fois plus lent). */
   ralenti: number;
   /** Simule `prefers-reduced-motion: reduce`. */
   reduit: boolean;
 };
 
-export const REGLAGES_DEFAUT: Reglages = {
-  variantes: { fond: "A" },
-  ralenti: 1,
-  reduit: false,
-};
+export const REGLAGES_DEFAUT: Reglages = { ralenti: 1, reduit: false };
 
 export const CLE_REGLAGES = "carnet-labo";
 export const EVENEMENT_REGLAGES = "carnet-reglages";
@@ -100,7 +79,6 @@ function lireReglages(): Reglages {
     if (!brut) return REGLAGES_DEFAUT;
     const lu = JSON.parse(brut) as Partial<Reglages>;
     return {
-      variantes: { ...REGLAGES_DEFAUT.variantes, ...lu.variantes },
       ralenti: typeof lu.ralenti === "number" && lu.ralenti > 0 ? lu.ralenti : 1,
       reduit: lu.reduit === true,
     };
@@ -136,7 +114,6 @@ export function enregistrerReglages(r: Reglages) {
   window.dispatchEvent(new Event(EVENEMENT_REGLAGES));
 }
 
-export const variante = (nom: NomReglage): Variante => reglages().variantes[nom];
 
 // --- Règles -----------------------------------------------------------------------
 

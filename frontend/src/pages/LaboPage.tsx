@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useJour, useVoyage, useVoyages } from "../api/requetes";
 import { useTitre } from "../hooks/useTitre";
 import { chemins } from "../lib/chemins";
-import type { Reglages, Variante } from "../lib/mouvement";
-import { REGLAGES_DEFAUT, VARIANTES, enregistrerReglages, reglages } from "../lib/mouvement";
+import type { Reglages } from "../lib/mouvement";
+import { REGLAGES_DEFAUT, enregistrerReglages, reglages } from "../lib/mouvement";
 import { idPhoto, idVoyage } from "../lib/transitions";
 import styles from "./LaboPage.module.css";
 
@@ -12,7 +12,7 @@ import styles from "./LaboPage.module.css";
  *
  * Le labo ne contient aucune démo recopiée : il affiche le VRAI site dans
  * deux iframes (téléphone et ordinateur) et le pilote (window.__carnet,
- * main.tsx). Les réglages (variante, ralenti, mouvement réduit) passent par
+ * main.tsx). Les réglages (ralenti, mouvement réduit) passent par
  * localStorage : les iframes, de même origine, les reçoivent par l'événement
  * `storage` et les appliquent dès la transition suivante (lib/mouvement.ts).
  */
@@ -55,7 +55,6 @@ export default function LaboPage() {
   const tel = useRef<HTMLIFrameElement>(null);
   const pc = useRef<HTMLIFrameElement>(null);
   const reglagesCourants = useRef(r);
-  const fond = r.variantes.fond;
 
   const changer = (nouveaux: Reglages) => {
     reglagesCourants.current = nouveaux;
@@ -150,26 +149,6 @@ export default function LaboPage() {
           </button>
         </div>
 
-        <section className={styles.transition}>
-          <h2>Fond des pages</h2>
-          <div className={styles.choix} role="radiogroup" aria-label="Variante du fond">
-            {(["A", "B", "C"] as Variante[]).map((v) => (
-              <button
-                key={v}
-                type="button"
-                role="radio"
-                aria-checked={fond === v}
-                onClick={() => changer({ ...r, variantes: { ...r.variantes, fond: v } })}
-              >
-                {v}
-                {REGLAGES_DEFAUT.variantes.fond === v && " ★"}
-              </button>
-            ))}
-          </div>
-          <p className={styles.description}>{VARIANTES.fond[fond]}</p>
-          <p className={styles.aide}>Appliqué tout de suite dans les cadres : navigue entre accueil, voyage et jours.</p>
-        </section>
-
         {(Object.keys(NOMS) as NomTransition[]).map((nom) => (
           <section key={nom} className={styles.transition} data-en-cours={enCours === nom || undefined}>
             <h2>{NOMS[nom]}</h2>
@@ -181,7 +160,6 @@ export default function LaboPage() {
           </section>
         ))}
         {!scenarios && <p className={styles.aide}>Chargement du voyage (il faut au moins deux jours et une photo)…</p>}
-        <p className={styles.aide}>★ = valeur par défaut (lib/mouvement.ts).</p>
       </aside>
 
       <div className={styles.ecrans}>

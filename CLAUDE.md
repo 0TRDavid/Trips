@@ -207,7 +207,7 @@ priorité n°1.
 - Ajout d'une dépendance front : `docker compose exec frontend npm install <paquet>` puis `docker compose up -d --build frontend`
 - URL de dev : http://192.168.30.252:5173 (le proxy Vite relaie `/api` vers le backend)
 - Routes du front : `/`, `/voyages/<slug>`, `/voyages/<slug>/jours/<date>`, `/voyages/<slug>/jours/<date>/photos/<id>` (visionneuse = route enfant du jour), 404 sinon
-- `/labo` (dev uniquement, absent du build) : rejoue chaque transition dans deux iframes du vrai site (téléphone 390 × 844, ordinateur), variantes du fond (A/B/C), ralenti, mouvement réduit simulé. Réglages en `localStorage` (`carnet-labo`). Une variante validée devient la valeur par défaut de `REGLAGES_DEFAUT` dans `lib/mouvement.ts` et les autres sont retirées.
+- `/labo` (dev uniquement, absent du build) : rejoue chaque transition dans deux iframes du vrai site (téléphone 390 × 844, ordinateur), ralenti, mouvement réduit simulé. Réglages en `localStorage` (`carnet-labo`). Pour comparer de futures variantes, les y remettre temporairement ; une fois validée, la variante devient la valeur des tokens et les autres sont retirées.
 
 ## Décisions
 Consigne chaque décision structurante dans `docs/decisions.md`
