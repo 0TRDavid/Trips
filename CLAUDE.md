@@ -177,6 +177,8 @@ priorité n°1.
 - Géocodage : Nominatim via `voyages/geocodage.py` uniquement (cache `LieuCherche`, 1 requête/s, pas d'autocomplétion, User-Agent sans donnée personnelle, contact facultatif `NOMINATIM_CONTACT`).
 - Front : toute photo passe par `composants/Photo.tsx` (srcset, ratio réservé, couleur + ThumbHash) ; une photo animée par `PhotoAnimee.tsx`, une vidéo dans la visionneuse par `LecteurVideo.tsx`, qui posent leur `<video>` dans `Photo` (prop `children`). Photo animée jouée une seule fois à son apparition, puis image fixe ; lecture automatique seulement sans `prefers-reduced-motion` (`hooks/useMouvementReduit.ts`). URL construites par `lib/chemins.ts`. Éléments partagés entre pages marqués `data-transition-id` via `lib/transitions.ts`.
 - Carte : MapLibre + OpenFreeMap, chargée en lazy ; ne pas retirer `setWorkerUrl` dans `CarteParcours.tsx`.
+- Mouvement : durées, courbes et ressorts **uniquement** dans `frontend/src/lib/mouvement.ts` (jamais de valeur en dur dans un composant ; en CSS, `var(--duree-…)`). On n'anime que `transform` et `opacity` (test Vitest sur toutes les variantes) ; une sortie est plus courte que son entrée ; le sens vient de `lib/navigation.ts` (sémantique : le retour du navigateur rejoue l'inverse). Transitions de pages dans `Layout.tsx` (AnimatePresence, page sortante figée en `position: fixed`). Élément partagé = `useVolEntrant` + `lib/vol.ts` (clone FLIP avec contre-échelle, jamais `layoutId`). Mouvement réduit : `useMouvementReduit()` / `mouvementReduit()`, tout devient un fondu.
+- Couleurs : palette d'un voyage ou d'un jour calculée par le serveur (`voyages/palette.py`, OKLCH, contraste AA testé), appliquée par `usePalette()` (`layout/contexte.ts`) en variables CSS : `--accent` = texte accentué, `--accent-vif` = surfaces et filets (jamais de petit texte), `--sur-accent` = texte sur `--accent-vif`, `--papier`/`--papier-2` = fonds, `--degrade`, `--halo-1..3` = halos du fond (`FondPage`). Nouvelle couleur de texte = vérifier son contraste sur `--papier-2` et les halos (`TEXTES_NEUTRES` dans `palette.py`).
 
 ## Commandes
 - `cp .env.example .env` : première fois seulement, puis changer les secrets
@@ -192,9 +194,10 @@ priorité n°1.
   Médias sans date (WhatsApp de Valérie) : importés masqués, à la date du fichier ; un jour qui n'a que des médias masqués n'apparaît pas sur le site.
   Génère ensuite les rendus web du voyage (sauf `--sans-rendus`) ; pour un gros encodage, préférer `--sans-rendus` puis `generer_rendus --processus 2` (mémoire de la VM).
 - `docker compose exec backend python manage.py generer_rendus [--voyage <slug>] [--photos 1,2,3] [--force] [--processus N] [--dry-run]` : rendus WebP (400 / 1280 / 2560 px, sans métadonnées) et MP4 H.264 (petit côté 720 et 1080, jamais agrandi, 30 i/s max, sans son pour une photo animée) dans le volume `rendus` (`/cache/rendus/<photo_id>/<etag>-<taille>.webp|mp4`). Deux pistes indépendantes (`rendus_etag`, `videos_etag`) : ne régénère que ce dont l'etag a changé ou dont un fichier manque. Japon (660 médias) : premier passage ~25 min avec `--processus 2`, cache 2,4 Go (dont MP4 des photos animées 1,1 Go, des vidéos 0,76 Go).
+- `docker compose exec backend python manage.py calculer_couleurs [--voyage <slug>] [--force]` : couleurs vives des médias (`Photo.couleurs`), lues dans les miniatures du cache (ni Nextcloud ni original). Fait automatiquement par `generer_rendus` pour les nouveaux médias ; à lancer pour l'existant.
 - `docker compose exec backend sh -c 'exiftool -q -a -s -gps:all -userdata:all -keys:all /cache/rendus/*/*.webp /cache/rendus/*/*.mp4'` : contrôle qu'aucun rendu ne contient de GPS (ne doit rien afficher)
 - API (lecture seule, `API_ACCES` dans `.env` : `prive-reseau` ou `connecte`) :
-  - `GET /api/voyages/` : voyages, dates, `nb_jours`, `nb_photos`, couverture (choisie, sinon premier favori, sinon première photo)
+  - `GET /api/voyages/` : voyages, dates, `nb_jours`, `nb_photos`, couverture (choisie, sinon premier favori, sinon première photo), `palette` (aussi sur le détail d'un voyage, chaque jour résumé et le détail d'un jour : `accent`, `accent_texte`, `sur_accent`, `fond`, `fond_2`, `degrade`, `halos`)
   - `GET /api/voyages/<slug>/` : + récit d'intro (`recit_intro` et `recit_intro_html`), jours résumés, `trace` GPS allégé `[{lat, lon, jour}]`
   - `GET /api/voyages/<slug>/jours/<AAAA-MM-JJ>/` : récit (Markdown + HTML), médias visibles dans l'ordre (`prise_le` avec le décalage du voyage ; `type`, `duree`, `videos` {"720", "1080"} ; `rendus` = image ou poster), `precedent` / `suivant`
   - `GET /api/voyages/<slug>/photos/` : toutes les photos visibles du voyage
@@ -204,6 +207,7 @@ priorité n°1.
 - Ajout d'une dépendance front : `docker compose exec frontend npm install <paquet>` puis `docker compose up -d --build frontend`
 - URL de dev : http://192.168.30.252:5173 (le proxy Vite relaie `/api` vers le backend)
 - Routes du front : `/`, `/voyages/<slug>`, `/voyages/<slug>/jours/<date>`, `/voyages/<slug>/jours/<date>/photos/<id>` (visionneuse = route enfant du jour), 404 sinon
+- `/labo` (dev uniquement, absent du build) : rejoue chaque transition dans deux iframes du vrai site (téléphone 390 × 844, ordinateur), ralenti, mouvement réduit simulé. Réglages en `localStorage` (`carnet-labo`). Pour comparer de futures variantes, les y remettre temporairement ; une fois validée, la variante devient la valeur des tokens et les autres sont retirées.
 
 ## Décisions
 Consigne chaque décision structurante dans `docs/decisions.md`

@@ -1,0 +1,42 @@
+.fond {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: max(110svh, 760px);
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  /* Les halos s'effacent vers le bas : la suite de la page reste sur le papier. */
+  mask-image: linear-gradient(to bottom, #000 45%, transparent);
+}
+
+.halo {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--teinte), transparent);
+}
+
+.h1 {
+  --teinte: var(--halo-1);
+  width: 85vmax;
+  height: 85vmax;
+  left: -30vmax;
+  top: -40vmax;
+}
+
+.h2 {
+  --teinte: var(--halo-2);
+  width: 75vmax;
+  height: 75vmax;
+  right: -30vmax;
+  top: -25vmax;
+}
+
+.h3 {
+  --teinte: var(--halo-3);
+  width: 60vmax;
+  height: 60vmax;
+  left: 15vw;
+  top: 20svh;
+}

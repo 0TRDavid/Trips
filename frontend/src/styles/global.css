@@ -12,6 +12,7 @@ html {
   /* Réserve la place de la barre de défilement : la page ne se décale pas
      quand elle apparaît ou que la visionneuse bloque le défilement. */
   scrollbar-gutter: stable;
+  background: var(--fond-gouttiere, var(--papier));
 }
 
 body {
@@ -72,3 +73,28 @@ html.sans-defilement {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Calque des éléments partagés en vol (lib/vol.ts) : au-dessus de tout,
+   n'intercepte aucun clic. Seuls transform et opacity y sont animés. */
+.calque-vol {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.calque-vol-boite {
+  position: absolute;
+  overflow: hidden;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.calque-vol-boite img {
+  position: absolute;
+  max-width: none;
+  transform-origin: center;
+  will-change: transform;
+}
+

@@ -7,6 +7,9 @@ Les récits sont renvoyés deux fois : en Markdown (la source) et en HTML
 nettoyé, produit par `voyages.markdown.rendre_markdown`, le même moteur que
 l'aperçu de l'admin.
 
+Chaque voyage et chaque jour porte sa `palette` (voyages/palette.py), tirée
+des couleurs vives de ses médias visibles, contrastes AA garantis.
+
 Les serializers ne déclenchent aucune requête : les vues leur passent des
 objets déjà chargés (annotations, prefetch, photos représentatives en contexte).
 """
@@ -18,6 +21,7 @@ from rest_framework import serializers
 
 from .markdown import rendre_markdown
 from .models import Jour, Photo, Voyage
+from .palette import palette
 from .rendus import TAILLES
 from .rendus_video import TAILLES_VIDEO
 
@@ -110,10 +114,14 @@ class JourResumeSerializer(serializers.ModelSerializer):
     nb_photos = serializers.IntegerField()
     recit_rempli = serializers.SerializerMethodField()
     photo = serializers.SerializerMethodField()
+    palette = serializers.SerializerMethodField()
 
     class Meta:
         model = Jour
-        fields = ["date", "titre", "lieu", "nb_photos", "recit_rempli", "photo"]
+        fields = ["date", "titre", "lieu", "nb_photos", "recit_rempli", "photo", "palette"]
+
+    def get_palette(self, jour):
+        return self.context["palettes_jours"].get(jour.date) or palette([])
 
     def get_recit_rempli(self, jour):
         return bool(jour.recit.strip())
@@ -137,15 +145,23 @@ class VoisinSerializer(serializers.ModelSerializer):
 
 class VoyageResumeSerializer(serializers.ModelSerializer):
     """Un voyage sur la page d'accueil. Attend les annotations `nb_jours`,
-    `nb_photos` et `couverture_effective_id`, et `context["photos"]`."""
+    `nb_photos` et `couverture_effective_id`, `context["photos"]` et
+    `context["palettes"]` ({voyage_id: palette})."""
 
     nb_jours = serializers.IntegerField()
     nb_photos = serializers.IntegerField()
     couverture = serializers.SerializerMethodField()
+    palette = serializers.SerializerMethodField()
 
     class Meta:
         model = Voyage
-        fields = ["slug", "titre", "date_debut", "date_fin", "fuseau_horaire", "nb_jours", "nb_photos", "couverture"]
+        fields = [
+            "slug", "titre", "date_debut", "date_fin", "fuseau_horaire", "nb_jours", "nb_photos",
+            "couverture", "palette",
+        ]
+
+    def get_palette(self, voyage):
+        return self.context["palettes"].get(voyage.id) or palette([])
 
     def get_couverture(self, voyage):
         return _vignette(self.context["photos"], voyage.couverture_effective_id)
@@ -173,8 +189,8 @@ class VoyageDetailSerializer(VoyageResumeSerializer):
 
 class JourDetailSerializer(serializers.ModelSerializer):
     """Page d'un jour. Attend `context["photos_du_jour"]`, `context["precedent"]`,
-    `context["suivant"]`, `context["photos"]` (vignettes des voisins) et
-    `context["fuseau"]`."""
+    `context["suivant"]`, `context["photos"]` (vignettes des voisins),
+    `context["fuseau"]` et `context["palette"]`."""
 
     voyage = serializers.SerializerMethodField()
     recit_html = serializers.SerializerMethodField()
@@ -184,7 +200,14 @@ class JourDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Jour
-        fields = ["date", "titre", "lieu", "recit", "recit_html", "voyage", "photos", "precedent", "suivant"]
+        fields = [
+            "date", "titre", "lieu", "recit", "recit_html", "voyage", "photos", "precedent", "suivant", "palette",
+        ]
+
+    palette = serializers.SerializerMethodField()
+
+    def get_palette(self, jour):
+        return self.context["palette"]
 
     def get_voyage(self, jour):
         v = jour.voyage

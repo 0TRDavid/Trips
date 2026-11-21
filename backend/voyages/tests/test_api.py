@@ -245,8 +245,8 @@ class NombreDeRequetesTests(TestCase):
     """Le nombre de requêtes de chaque endpoint ne dépend pas du volume de données."""
 
     ATTENDU = {
-        "/api/voyages/": 3,  # voyages annotés, photos de couverture, rendus
-        "/api/voyages/japon-2025/": 5,  # voyage, jours, photos, rendus, tracé
+        "/api/voyages/": 4,  # voyages annotés, photos de couverture, rendus, couleurs (palettes)
+        "/api/voyages/japon-2025/": 5,  # voyage, jours, photos, rendus, médias (tracé + palettes)
         "/api/voyages/japon-2025/jours/2025-06-02/": 6,  # jour, jours, photos, rendus, vignettes voisines, rendus
     }
 

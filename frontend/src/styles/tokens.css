@@ -1,15 +1,24 @@
-/* Palette et typographie PROVISOIRES (étape 5). Tout le reste du CSS passe
-   par ces variables : l'étape 6 pourra les remplacer sans toucher aux
-   composants. */
+/* Palette par défaut (accueil, pages sans photo). Sur les pages d'un voyage
+   ou d'un jour, `--accent`, `--accent-vif`, `--sur-accent`, `--papier`,
+   `--papier-2` et `--degrade` sont remplacées par la palette tirée de ses
+   photos (lib/palette.ts, posée par le Layout), ainsi que `--halo-1..3`. Tout le CSS passe par ces
+   variables. Durées et courbes : lib/mouvement.ts (seule source). */
 :root {
   --papier: #f6f3ee;
   --papier-2: #ece7df;
   --encre: #1d1b18;
   --encre-2: #5d5850;
-  --encre-3: #8a847a;
-  --filet: #d9d2c6;
-  --accent: #b4532a;
-  --accent-doux: #e9c9b8;
+  --encre-3: #68625a; /* AA sur --papier-2 et les halos (était #8a847a, 3:1) */
+  --accent: #a4461f; /* texte accentué (AA sur --papier et --papier-2) */
+  --accent-vif: #d0693a; /* surfaces, filets, jamais du petit texte */
+  --sur-accent: #1d1b18; /* texte sur --accent-vif */
+  --degrade: linear-gradient(90deg, #d0693a, #d4a13c, #5f9a6b);
+  --halo-1: #ffe9e0; /* pastels du fond (FondPage), AA pour tout texte */
+  --halo-2: #ffe8bd;
+  --halo-3: #d9f3df;
+  /* Dérivées de la palette courante : se teintent avec elle. */
+  --filet: color-mix(in oklch, var(--accent-vif) 22%, var(--papier-2));
+  --accent-doux: color-mix(in oklch, var(--accent-vif) 40%, var(--papier));
   --nuit: #0b0b0b;
   --nuit-texte: #e9e6e1;
 
@@ -20,4 +29,5 @@
   --largeur-max: 1400px;
   --largeur-lecture: 38rem;
   --rayon: 6px;
+  --hauteur-entete: 3.4rem;
 }

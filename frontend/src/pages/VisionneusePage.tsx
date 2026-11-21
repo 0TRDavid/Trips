@@ -64,6 +64,7 @@ export default function VisionneusePage() {
       photos={photos}
       index={index}
       date={jour.date}
+      depuisGalerie={etat?.depuisJour === true}
       precedent={() => aller(index - 1)}
       suivant={() => aller(index + 1)}
       fermer={fermer}

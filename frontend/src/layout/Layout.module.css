@@ -2,18 +2,37 @@
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  /* Une page qui glisse sur le côté ne crée pas de défilement horizontal
+     (clip, et non hidden : la carte collante continue de fonctionner). */
+  overflow-x: clip;
 }
 
+/* La marque flotte au-dessus des pages : chaque page porte son propre fond
+   teinté jusqu'en haut de l'écran, et deux pages peuvent se croiser dessous. */
 .entete {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  height: var(--hauteur-entete);
   width: 100%;
   max-width: var(--largeur-max);
   margin: 0 auto;
-  padding: 0.9rem var(--marge);
+  padding: 0 var(--marge);
   display: flex;
   align-items: center;
+  pointer-events: none;
+}
+
+/* Visionneuse ouverte : la marque ne passe pas par-dessus. */
+:global(html.sans-defilement) .entete {
+  visibility: hidden;
 }
 
 .marque {
+  pointer-events: auto;
   font-family: var(--police-titre);
   font-size: 1.05rem;
   font-style: italic;
@@ -31,11 +50,19 @@
   flex-direction: column;
 }
 
+/* Une page : son fond (teinté par sa palette) couvre tout l'écran. Celle
+   qui entre passe au-dessus de celle qui sort (z-index 0, posé en ligne). */
 .page {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 100dvh;
+  padding-top: var(--hauteur-entete);
+  position: relative;
+  z-index: 1;
+  background: var(--papier);
+  color: var(--encre);
 }
 
 .evitement {

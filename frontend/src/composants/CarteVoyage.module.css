@@ -36,3 +36,24 @@
   color: var(--encre-2);
   font-size: 0.95rem;
 }
+
+/* Dégradé des couleurs du voyage : un filet qui s'allonge au survol
+   (scaleX : transform seulement). */
+.filet {
+  display: block;
+  height: 3px;
+  width: 3.5rem;
+  border-radius: 2px;
+  background: var(--degrade);
+  transform-origin: left;
+  transition: transform var(--duree-normale) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.carte:hover .filet,
+.carte:focus-visible .filet {
+  transform: scaleX(1.8);
+}
+
+.carte:hover .titre {
+  color: var(--accent);
+}

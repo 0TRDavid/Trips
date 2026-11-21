@@ -1,11 +1,22 @@
 import { useSyncExternalStore } from "react";
+import { EVENEMENT_REGLAGES, reglages } from "../lib/mouvement";
 
 const REQUETE = "(prefers-reduced-motion: reduce)";
 
 function abonner(changement: () => void) {
   const liste = window.matchMedia(REQUETE);
   liste.addEventListener("change", changement);
-  return () => liste.removeEventListener("change", changement);
+  // En dev, le labo peut simuler le réglage.
+  window.addEventListener(EVENEMENT_REGLAGES, changement);
+  return () => {
+    liste.removeEventListener("change", changement);
+    window.removeEventListener(EVENEMENT_REGLAGES, changement);
+  };
+}
+
+/** Lecture ponctuelle, hors composant (Layout, vols). */
+export function mouvementReduit(): boolean {
+  return window.matchMedia(REQUETE).matches || reglages().reduit;
 }
 
 /**
@@ -16,9 +27,5 @@ function abonner(changement: () => void) {
  * React, ici une media query, sans état dupliqué ni effet à écrire.)
  */
 export function useMouvementReduit(): boolean {
-  return useSyncExternalStore(
-    abonner,
-    () => window.matchMedia(REQUETE).matches,
-    () => false,
-  );
+  return useSyncExternalStore(abonner, mouvementReduit, () => false);
 }
