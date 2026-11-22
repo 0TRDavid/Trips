@@ -174,25 +174,93 @@
 }
 
 /* Vidéo : pastille ▶ + durée, en bas à gauche de l'aperçu. */
-.badgeVideo {
+/* Vidéo : étiquette « Lire » au centre, comme « Glisser » sur la couverture :
+   un rond fin avec ▶, le mot et la durée dessous ; clair ou sombre selon la photo. */
+.lireVideo {
   position: absolute;
-  left: 0.4rem;
-  bottom: 0.4rem;
-  display: inline-flex;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.15rem 0.45rem 0.15rem 0.35rem;
-  border-radius: 999px;
-  background: rgb(0 0 0 / 0.5);
-  color: #fff;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.4;
+  justify-content: center;
+  gap: 0.6rem;
   pointer-events: none;
+  --teinte-lire: #fff;
+  --ombre-lire: rgb(0 0 0 / 0.45);
+  color: var(--teinte-lire);
+  text-shadow: 0 1px 10px var(--ombre-lire);
 }
 
-.triangle {
-  font-size: 0.65rem;
+.lireVideo[data-clair] {
+  --teinte-lire: oklch(0.2 0 0);
+  --ombre-lire: rgb(255 255 255 / 0.55);
+}
+
+.lireRond {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1.5px solid var(--teinte-lire);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ombre-lire) 60%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 16px var(--ombre-lire);
+  transition: transform var(--duree-normale) ease;
+}
+
+/* Triangle dessiné (pas de glyphe ▶, rendu variable selon les polices), centré optiquement. */
+.lireTriangle {
+  width: 0;
+  height: 0;
+  margin-left: 0.3rem;
+  border-style: solid;
+  border-width: 0.75rem 0 0.75rem 1.2rem;
+  border-color: transparent transparent transparent var(--teinte-lire);
+}
+
+.lireTexte {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.lien:hover .lireRond,
+.lien:focus-visible .lireRond {
+  transform: scale(1.08);
+}
+
+/* Téléphone : cases de 150 px, rond plus petit, la durée seule. */
+@media (max-width: 699px) {
+  .lireVideo {
+    gap: 0.3rem;
+  }
+  .lireRond {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+  .lireTriangle {
+    margin-left: 0.18rem;
+    border-width: 0.45rem 0 0.45rem 0.72rem;
+  }
+  .lireTexte {
+    font-size: 0.7rem;
+  }
+  .lireMot {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lireRond {
+    transition: none;
+  }
+  .lien:hover .lireRond,
+  .lien:focus-visible .lireRond {
+    transform: none;
+  }
 }
 
 /* --- Ordinateur : mosaïque plein écran, page par page ----------------------

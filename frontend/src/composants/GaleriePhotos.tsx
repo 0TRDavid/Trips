@@ -310,9 +310,15 @@ function Cellule({ slug, date, photo, sizes, style, className, mode, avecLegende
       >
         {image}
         {photo.type === "video" && !enLecture && (
-          <span className={styles.badgeVideo} aria-hidden="true">
-            <span className={styles.triangle}>▶</span>
-            {formatDuree(photo.duree)}
+          // Étiquette « Lire » au centre, dans l'esprit de « Glisser » (clair ou sombre selon la photo).
+          <span className={styles.lireVideo} data-clair={estClaire(photo.couleur) ? "" : undefined} aria-hidden="true">
+            <span className={styles.lireRond}>
+              <span className={styles.lireTriangle} />
+            </span>
+            <span className={styles.lireTexte}>
+              <span className={styles.lireMot}>Lire{photo.duree != null && " · "}</span>
+              {formatDuree(photo.duree)}
+            </span>
           </span>
         )}
         {photo.favori && !enLecture && (
