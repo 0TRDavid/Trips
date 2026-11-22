@@ -43,6 +43,8 @@ export type PhotoJour = PhotoResume & {
   favori: boolean;
   /** Prénom tiré du sous-dossier Nextcloud ("Hugo"), vide si inconnu. */
   photographe: string;
+  /** Couleur la plus marquante du média (palette.py), null s'il est terne. */
+  couleur_vive: string | null;
 };
 
 /**
@@ -103,12 +105,16 @@ export type JourVoisin = {
   photo: PhotoResume | null;
 };
 
+export type BlocRecit = { heure: string | null; html: string };
+
 export type JourDetail = {
   date: string;
   titre: string;
   lieu: string;
   recit: string;
   recit_html: string;
+  /** Récit découpé aux marqueurs `[[14h]]` (heure "14:00", null = avant tout marqueur). */
+  recit_blocs: BlocRecit[];
   voyage: { slug: string; titre: string; fuseau_horaire: string };
   photos: PhotoJour[];
   precedent: JourVoisin | null;

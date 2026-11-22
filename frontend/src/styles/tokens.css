@@ -33,6 +33,7 @@
   --largeur-lecture: 38rem;
   --rayon: 6px;
   --hauteur-entete: 3.4rem;
+  --hauteur-barre: 3.4rem; /* barre du jour (BarreJour) ; les heures collantes se posent dessous */
   --carte-min: 340px; /* largeur mini d'une carte de voyage (accueil) */
   --h-galerie-large: 320px; /* hauteur de rangée de la galerie, écran ≥ 1200 px */
 }

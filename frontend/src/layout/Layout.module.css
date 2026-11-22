@@ -26,8 +26,10 @@
   pointer-events: none;
 }
 
-/* Visionneuse ouverte : la marque ne passe pas par-dessus. */
-:global(html.sans-defilement) .entete {
+/* Visionneuse ouverte, ou page jour (photo d'ouverture plein écran) : la
+   marque ne passe pas par-dessus. */
+:global(html.sans-defilement) .entete,
+:global(html.sans-marque) .entete {
   visibility: hidden;
 }
 
@@ -63,6 +65,10 @@
   z-index: 1;
   background: var(--papier);
   color: var(--encre);
+  /* Couleurs dérivées recalculées ICI, où la palette de la page est posée :
+     déclarées sur :root, elles y sont figées avec l'accent par défaut. */
+  --filet: color-mix(in oklch, var(--accent-vif) 22%, var(--papier-2));
+  --accent-doux: color-mix(in oklch, var(--accent-vif) 40%, var(--papier));
 }
 
 .evitement {

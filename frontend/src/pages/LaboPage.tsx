@@ -3,7 +3,14 @@ import { useJour, useVoyage, useVoyages } from "../api/requetes";
 import { useTitre } from "../hooks/useTitre";
 import { chemins } from "../lib/chemins";
 import type { Reglages } from "../lib/mouvement";
-import { REGLAGES_DEFAUT, enregistrerReglages, reglages } from "../lib/mouvement";
+import {
+  REGLAGES_DEFAUT,
+  VARIANTES_APPARITION,
+  VARIANTES_COLLANT,
+
+  enregistrerReglages,
+  reglages,
+} from "../lib/mouvement";
 import { idPhoto, idVoyage } from "../lib/transitions";
 import styles from "./LaboPage.module.css";
 
@@ -22,6 +29,7 @@ type Pilote = {
   retour: () => Promise<void>;
   montrer: (selecteur: string) => void;
   chemin: () => string;
+  defiler: (vitesse: number) => Promise<void>;
 };
 
 const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -30,14 +38,27 @@ const pilote = (f: HTMLIFrameElement | null) =>
 
 type Scenario = { depart: string; arrivee: string; etat?: unknown; montrer?: string };
 
-type NomTransition = "voyage" | "photo" | "jour" | "page";
+type NomTransition = "voyage" | "photo" | "jour" | "page" | "defilement";
 
 const NOMS: Record<NomTransition, string> = {
   voyage: "T1 · Carte du voyage → en-tête",
   photo: "T2 · Miniature → plein écran → retour",
   jour: "T3 · Jour suivant, puis retour",
   page: "T4 · Vignette de la timeline → en-tête du jour",
+  defilement: "T5 · Défilement de la journée la plus chargée",
 };
+
+const LIBELLES: Record<string, string> = {
+  aucune: "aucune",
+  fondu: "fondu",
+  montee: "montée",
+  cascade: "cascade",
+  pousse: "chaque heure poussée par la suivante",
+  bandeau: "bandeau unique",
+};
+
+/** Vitesses de lecture de T5, en px/s. */
+const VITESSES = [300, 600, 1200] as const;
 
 /** Taille simulée du cadre « ordinateur ». */
 const ECRANS = [
@@ -57,6 +78,12 @@ export default function LaboPage() {
   const j2 = jours[2]?.date ?? jours[1]?.date ?? "";
   const { data: jour } = useJour(slug, j1, !!j1);
   const photo = jour?.photos[0];
+  // T5 : la journée qui a le plus de photos.
+  const plusChargee = jours.reduce<(typeof jours)[number] | undefined>(
+    (m, j) => (!m || j.nb_photos > m.nb_photos ? j : m),
+    undefined,
+  )?.date;
+  const [vitesse, setVitesse] = useState<number>(600);
 
   const [r, setR] = useState<Reglages>(() => reglages());
   const [enCours, setEnCours] = useState<string | null>(null);
@@ -92,6 +119,7 @@ export default function LaboPage() {
           },
           jour: { depart: chemins.jour(slug, j1), arrivee: chemins.jour(slug, j2) },
           page: { depart: chemins.voyage(slug), arrivee: chemins.jour(slug, j1) },
+          defilement: { depart: chemins.jour(slug, plusChargee ?? j1), arrivee: "" },
         }
       : null;
 
@@ -119,11 +147,24 @@ export default function LaboPage() {
     await attendre(pause());
   }
 
+  /** T5 : recharge la journée (rien de déjà vu), puis la fait défiler jusqu'en bas. */
+  async function defiler() {
+    const s = scenarios?.defilement;
+    if (!s) return;
+    const ps = cadres();
+    await Promise.all(ps.map((p) => p.naviguer("/", { replace: true })));
+    await attendre(300);
+    await Promise.all(ps.map((p) => p.naviguer(s.depart, { replace: true })));
+    await attendre(1200 * reglagesCourants.current.ralenti);
+    await Promise.all(ps.map((p) => p.defiler(vitesse / reglagesCourants.current.ralenti)));
+  }
+
   async function lancer(nom: NomTransition) {
     if (enCours) return;
     setEnCours(nom);
     try {
-      await allerRetour(nom);
+      if (nom === "defilement") await defiler();
+      else await allerRetour(nom);
     } finally {
       setEnCours(null);
     }
@@ -157,6 +198,39 @@ export default function LaboPage() {
           <button type="button" onClick={() => changer(REGLAGES_DEFAUT)}>
             Valeurs par défaut
           </button>
+        </div>
+
+        <div className={styles.globaux}>
+          <strong>Page jour</strong>
+          {(
+            [
+              ["apparition", "Apparition des photos", VARIANTES_APPARITION],
+              ["collant", "Heure collante", VARIANTES_COLLANT],
+            ] as const
+          ).map(([cle, libelle, valeurs]) => (
+            <label key={cle}>
+              {libelle}{" "}
+              <select value={r[cle]} onChange={(e) => changer({ ...r, [cle]: e.target.value })}>
+                {valeurs.map((v) => (
+                  <option key={v} value={v}>
+                    {LIBELLES[v] ?? v}
+                    {v === REGLAGES_DEFAUT[cle] ? " (défaut)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+          <label>
+            Vitesse de T5{" "}
+            <select value={vitesse} onChange={(e) => setVitesse(Number(e.target.value))}>
+              {VITESSES.map((v) => (
+                <option key={v} value={v}>
+                  {v} px/s
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className={styles.aide}>Ces variantes s'appliquent à la prochaine page jour affichée (T5 la recharge).</p>
         </div>
 
         {avecPc && (

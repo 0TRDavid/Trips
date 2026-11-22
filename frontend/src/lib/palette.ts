@@ -27,3 +27,14 @@ export function variablesPalette(palette: Palette | undefined | null): CSSProper
     "--halo-3": palette.halos[2],
   } as CSSProperties;
 }
+
+/** Photo claire (luminance relative > 0,45) : titre sombre sur voile clair. */
+export function estClaire(hex: string): boolean {
+  const m = hex.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return false;
+  const [r, g, b] = m.slice(1).map((x) => {
+    const c = parseInt(x, 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45;
+}

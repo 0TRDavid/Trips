@@ -123,6 +123,18 @@ class DetailJourTests(TestCase):
     def get(self, d="2025-06-02"):
         return self.client.get(f"/api/voyages/japon-2025/jours/{d}/")
 
+    def test_recit_intercale(self):
+        self.jour.recit = "Matin.\n\n[[14h30]]\nLe marché."
+        self.jour.save()
+
+        d = self.get().json()
+
+        self.assertEqual(d["recit_html"], "<p>Matin.</p>\n<p>Le marché.</p>")
+        self.assertEqual(
+            d["recit_blocs"],
+            [{"heure": None, "html": "<p>Matin.</p>"}, {"heure": "14:30", "html": "<p>Le marché.</p>"}],
+        )
+
     def test_recit_et_photos(self):
         self.jour.recit = "## Kyoto\n\nPluie."
         self.jour.lieu = "Kyoto"
@@ -133,17 +145,24 @@ class DetailJourTests(TestCase):
         self.assertEqual((d["date"], d["titre"], d["lieu"]), ("2025-06-02", "Jour 2", "Kyoto"))
         self.assertEqual(d["recit"], "## Kyoto\n\nPluie.")
         self.assertEqual(d["recit_html"], "<h2>Kyoto</h2>\n<p>Pluie.</p>")
+        self.assertEqual(d["recit_blocs"], [{"heure": None, "html": "<h2>Kyoto</h2>\n<p>Pluie.</p>"}])
         self.assertEqual(d["voyage"], {"slug": "japon-2025", "titre": "Japon 2025", "fuseau_horaire": "Asia/Tokyo"})
         photo = d["photos"][0]
         self.assertEqual(
             set(photo),
             {"id", "largeur", "hauteur", "couleur", "placeholder", "rendus", "prise_le", "legende", "favori",
-             "photographe", "type", "duree", "videos"},
+             "photographe", "type", "duree", "videos", "couleur_vive"},
         )
+        self.assertIsNone(photo["couleur_vive"])
         self.assertEqual((photo["type"], photo["duree"], photo["videos"]), ("photo", None, {}))
         self.assertEqual(photo["photographe"], "")
         self.assertEqual((photo["largeur"], photo["hauteur"], photo["couleur"]), (3000, 2000, "#336699"))
         self.assertEqual(photo["rendus"]["moyenne"]["url"], f"/media/rendus/{photo['id']}/abc-moyenne.webp")
+
+    def test_couleur_vive(self):
+        Photo.objects.filter(jour=self.jour).update(couleurs=[{"hex": "#c2185b", "part": 0.12}, {"hex": "#1565c0", "part": 0.3}])
+
+        self.assertEqual({p["couleur_vive"] for p in self.get().json()["photos"]}, {"#c2185b"})
 
     def test_video_et_photo_animee(self):
         creer_photo(self.jour, 5, type=Photo.Type.VIDEO, duree=54.12)

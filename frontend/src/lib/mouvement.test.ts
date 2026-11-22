@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GenreNavigation, Navigation } from "./mouvement";
 import {
   REGLAGES_DEFAUT,
+  apparitionPhoto,
+  barreJour,
+  ouverturePleinEcran,
+  arriveeTitre,
+  roulementHeure,
   enregistrerReglages,
   entree,
   sortie,
@@ -193,5 +198,71 @@ describe("trajectoire précalculée du vol", () => {
     expect(avancements[0]).toBe(0);
     expect(avancements.at(-1)).toBeCloseTo(1);
     expect(avancements[3]).toBeGreaterThan(3 / avancements.length); // expo-out : rapide au début
+  });
+});
+
+describe("page jour : défilement", () => {
+  it("une apparition finit sans transform, garde son état de départ pendant le délai, et son décalage est plafonné", () => {
+    for (const v of ["fondu", "montee", "cascade"] as const) {
+      const a = apparitionPhoto(v, false, 3)!;
+      const fin = a.images.at(-1)!;
+      expect(fin.opacity).toBe(1);
+      expect(fin.transform ?? "none").toBe("none");
+      expect(a.options.fill).toBe("backwards");
+      expect(apparitionPhoto(v, false, 50)!.options.delay).toBe(apparitionPhoto(v, false, 6)!.options.delay);
+    }
+    expect(apparitionPhoto("aucune", false, 0)).toBeNull();
+  });
+
+  it("mouvement réduit : un fondu, sans déplacement ni délai", () => {
+    const a = apparitionPhoto("cascade", true, 4)!;
+    expect(a.images.some((i) => "transform" in i)).toBe(false);
+    expect(a.options.delay).toBe(0);
+    const r = roulementHeure(1, true);
+    expect([...r.entree.images, ...r.sortie.images].some((i) => "transform" in i)).toBe(false);
+  });
+
+  it("le roulement d'heure : entrée finie sans transform, sortie plus courte, sens respecté", () => {
+    const bas = roulementHeure(1, false);
+    const haut = roulementHeure(-1, false);
+    expect(bas.entree.images.at(-1)!.transform).toBe("none");
+    expect(Number(bas.sortie.options.duration)).toBeLessThan(Number(bas.entree.options.duration));
+    expect(bas.entree.images[0].transform).not.toBe(haut.entree.images[0].transform);
+  });
+
+  it("ouverture plein écran : photo jamais déformée, titre collé à son bas puis à sa place", () => {
+    const m = { haut: 100, bandeau: 600, plein: 900, basTitre: 900 };
+    const o = ouverturePleinEcran(m);
+    const nombres = (t: string) => [...t.matchAll(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g)].map((x) => Number(x[0]));
+    o.cadre.transform.forEach((c, i) => {
+      const [, s] = nombres(c);
+      const [, ty, , k] = nombres(o.photo.transform[i]);
+      expect(s * k).toBeCloseTo(1, 9); // contre-échelle exacte
+      expect(ty + (m.plein * k) / 2).toBeCloseTo(m.bandeau / 2, 6); // photo centrée
+      // Tant que le titre est clair (posé sur la photo), il est au-dessus de son bord.
+      if (o.titreSurPhoto.opacity[i] === 1) {
+        const [, dy] = nombres(o.titreSurPhoto.transform[i]);
+        expect(m.basTitre + dy).toBeLessThanOrEqual(m.haut + m.bandeau * s);
+      }
+    });
+    expect(nombres(o.cadre.transform[0])[1]).toBeCloseTo(1.5, 9); // jusqu'au bas de l'écran
+    expect(o.cadre.transform.at(-1)).toBe("scale(1, 1)"); // puis la taille du bandeau
+    expect(o.titre.transform.at(-1)).toBe("translate(0px, 0px)"); // titre à sa place
+    expect(o.titre.opacity.at(-1)).toBe(1);
+    expect(o.titreSurPhoto.opacity.at(-1)).toBe(0);
+  });
+
+  it("le titre arrive de la gauche et finit sans transform", () => {
+    const a = arriveeTitre(false);
+    expect(a.images.at(-1)).toEqual({ opacity: 1, transform: "none" });
+    expect(Object.keys(arriveeTitre(true).images[0])).toEqual(["opacity"]);
+  });
+
+  it("barre du jour : entrée qui finit sans transform, sortie plus courte", () => {
+    const entree = barreJour(true, false);
+    const sortie = barreJour(false, false);
+    expect(entree.images.at(-1)).toEqual({ opacity: 1, transform: "none" });
+    expect(Number(sortie.options.duration)).toBeLessThan(Number(entree.options.duration));
+    expect(Object.keys(barreJour(true, true).images[0])).toEqual(["opacity"]);
   });
 });

@@ -18,6 +18,19 @@ if (import.meta.env.DEV) {
     retour: () => router.navigate(-1),
     montrer: (selecteur: string) => document.querySelector(selecteur)?.scrollIntoView({ block: "center" }),
     chemin: () => window.location.pathname,
+    // Fait défiler la page jusqu'en bas à vitesse constante (px/s), comme un lecteur.
+    defiler: (vitesse: number) =>
+      new Promise<void>((fini) => {
+        let avant = performance.now();
+        const pas = (maintenant: number) => {
+          const y = window.scrollY + (vitesse * (maintenant - avant)) / 1000;
+          avant = maintenant;
+          window.scrollTo(0, y);
+          if (y >= document.documentElement.scrollHeight - window.innerHeight - 1) fini();
+          else requestAnimationFrame(pas);
+        };
+        requestAnimationFrame(pas);
+      }),
   };
 }
 

@@ -1,6 +1,25 @@
-.moments {
+.journee {
+  /* Hauteur de rangée et espace entre photos, déclarés ici pour que les
+     moments s'en servent aussi (variantes « heures creuses »).
+     Téléphone, 150 px : un paysage occupe la largeur, deux ou trois portraits
+     se partagent une rangée. */
+  --h: 150px;
+  --espace: 4px;
   display: grid;
   gap: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+@media (min-width: 700px) {
+  .journee {
+    --h: 260px;
+    --espace: 6px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .journee {
+    --h: var(--h-galerie-large);
+  }
 }
 
 .moment {
@@ -8,49 +27,107 @@
   gap: 0.6rem;
 }
 
-/* Intitulé d'heure : petit, discret, prolongé par un filet. */
+/* Intitulé d'heure : petit, discret, prolongé par un filet qui se remplit
+   avec la progression de la journée (ProgressionJour). Variante « pousse » :
+   il colle en haut de l'écran tant qu'on parcourt ses photos, puis l'heure
+   suivante le pousse (sticky dans sa section, sans JavaScript). */
 .heure {
+  position: sticky;
+  /* Sous la barre du jour, toujours affichée quand on parcourt la galerie. */
+  top: var(--hauteur-barre);
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin: 0;
+  margin: 0 calc(-1 * var(--marge));
+  padding: 0.55rem var(--marge);
   font-family: var(--police-titre);
   font-size: clamp(1rem, 1.6vw, 1.2rem);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--encre-2);
+  /* srgb : en oklch, le mélange avec transparent perd la teinte (fond rosé). */
+  background: color-mix(in srgb, var(--papier) 86%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
-.heure::after {
+/* Variante « bandeau » : un seul bandeau collant (BandeauHeure) ; les
+   intitulés des moments restent dans le flux, sans fond. */
+.journee[data-collant="bandeau"] .moment > .heure {
+  position: static;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  padding-block: 0;
+}
+
+.journee[data-collant="bandeau"] .moment > .heure::after {
   content: "";
   flex: 1;
   height: 1px;
   background: var(--filet);
 }
 
+/* Libellés empilés dans la même case : l'heure qui part et celle qui arrive. */
+.libelles {
+  display: inline-grid;
+  overflow: clip;
+}
+
+.libelles > * {
+  grid-area: 1 / 1;
+}
+
+.libelle {
+  white-space: nowrap;
+}
+
+.sortant {
+  pointer-events: none;
+}
+
+.filet {
+  position: relative;
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  overflow: hidden;
+  background: var(--filet);
+}
+
+.rempli {
+  position: absolute;
+  inset: 0;
+  background: var(--accent-vif);
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+
+.fin {
+  font-family: var(--police-texte);
+  font-size: 0.8rem;
+  color: var(--encre-3);
+}
+
+/* Récit intercalé entre les moments (ou au milieu d'une heure). */
+.recit {
+  max-width: var(--largeur-lecture);
+  margin-block: 0.5rem 0.75rem;
+}
+
+/* Sous l'écran, en attendant d'y entrer (hooks/useApparitionPhotos.ts). */
+[data-apparition="attente"] {
+  opacity: 0;
+}
+
 .galerie {
-  /* 110 px : deux paysages 4:3 tiennent côte à côte sur un téléphone de 375 px. */
-  --h: 110px;
-  --espace: 4px;
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
   gap: var(--espace);
-}
-
-@media (min-width: 700px) {
-  .galerie {
-    --h: 260px;
-    --espace: 6px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .galerie {
-    --h: var(--h-galerie-large);
-  }
 }
 
 /* La dernière rangée garde sa hauteur au lieu de s'étirer sur toute la largeur. */
@@ -71,9 +148,15 @@
 .lien {
   position: relative;
   display: block;
+  cursor: pointer;
   height: 100%;
   border-radius: 3px;
   overflow: hidden;
+}
+
+/* Vidéo en lecture : les clics vont à ses contrôles. */
+.lien[data-lecture] {
+  cursor: auto;
 }
 
 .lien:focus-visible {
@@ -91,23 +174,351 @@
 }
 
 /* Vidéo : pastille ▶ + durée, en bas à gauche de l'aperçu. */
-.badgeVideo {
+/* Vidéo : étiquette « Lire » au centre, comme « Glisser » sur la couverture :
+   un rond fin avec ▶, le mot et la durée dessous ; clair ou sombre selon la photo. */
+.lireVideo {
   position: absolute;
-  left: 0.4rem;
-  bottom: 0.4rem;
-  display: inline-flex;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.15rem 0.45rem 0.15rem 0.35rem;
-  border-radius: 999px;
-  background: rgb(0 0 0 / 0.5);
-  color: #fff;
-  font-size: 0.75rem;
+  justify-content: center;
+  gap: 0.6rem;
+  pointer-events: none;
+  --teinte-lire: #fff;
+  --ombre-lire: rgb(0 0 0 / 0.45);
+  --voile-lire: rgb(0 0 0 / 0.35);
+  color: var(--teinte-lire);
+  text-shadow: 0 1px 10px var(--ombre-lire);
+}
+
+.lireVideo[data-clair] {
+  --teinte-lire: oklch(0.2 0 0);
+  --ombre-lire: rgb(255 255 255 / 0.55);
+  --voile-lire: rgb(255 255 255 / 0.4);
+}
+
+.lireRond {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1.5px solid var(--teinte-lire);
+  border-radius: 50%;
+  /* Voile uni, sans backdrop-filter (rendu en damier par certains navigateurs). */
+  background: var(--voile-lire);
+  transition: transform var(--duree-normale) ease;
+}
+
+/* Triangle dessiné (pas de glyphe ▶, rendu variable selon les polices), centré optiquement. */
+.lireTriangle {
+  width: 0;
+  height: 0;
+  margin-left: 0.3rem;
+  border-style: solid;
+  border-width: 0.75rem 0 0.75rem 1.2rem;
+  border-color: transparent transparent transparent var(--teinte-lire);
+}
+
+.lireTexte {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   font-variant-numeric: tabular-nums;
-  line-height: 1.4;
+}
+
+.lien:hover .lireRond,
+.lien:focus-visible .lireRond {
+  transform: scale(1.08);
+}
+
+/* Téléphone : cases de 150 px, rond plus petit, la durée seule. */
+@media (max-width: 699px) {
+  .lireVideo {
+    gap: 0.3rem;
+  }
+  .lireRond {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+  .lireTriangle {
+    margin-left: 0.18rem;
+    border-width: 0.45rem 0 0.45rem 0.72rem;
+  }
+  .lireTexte {
+    font-size: 0.7rem;
+  }
+  .lireMot {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lireRond {
+    transition: none;
+  }
+  .lien:hover .lireRond,
+  .lien:focus-visible .lireRond {
+    transform: none;
+  }
+}
+
+/* --- Ordinateur : mosaïque plein écran, page par page ----------------------
+   Chaque page de la mosaïque occupe un écran sous la barre du jour ; la
+   molette passe d'une page à l'autre (hooks/useDefilementParPage.ts). La
+   sonde mesure la hauteur de la barre. */
+.sonde {
+  position: absolute;
+  height: var(--hauteur-barre);
+  width: 1px;
+  visibility: hidden;
   pointer-events: none;
 }
 
-.triangle {
-  font-size: 0.65rem;
+.journee[data-plein-ecran] {
+  display: grid;
+}
+
+/* Pages collées : la suivante commence exactement au bas de l'écran. */
+.pages {
+  display: grid;
+}
+
+/* --- Photo seule d'une mosaïque : entière, sur sa version floue ----------- */
+.pagePhoto {
+  position: relative;
+  /* Bord à bord : mange la marge de la page. */
+  margin-inline: calc(-1 * var(--marge));
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Fond d'une photo montrée entière : sa propre version floue, assombrie. */
+.fondFlou {
+  position: absolute;
+  inset: -4%;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  filter: blur(24px) brightness(0.75);
+  transform: scale(1.05);
+}
+
+.listePhoto {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.cellulePhoto {
+  position: relative;
+  height: 100%;
+}
+
+.cellulePhoto > .lien {
+  border-radius: 0;
+}
+
+.cellulePhoto > .lien > :first-child {
+  height: 100%;
+}
+
+/* --- Mosaïque : deux photos par écran, bord à bord ------------------------- */
+.mosaique {
+  position: relative;
+  list-style: none;
+  margin: 0 calc(-1 * var(--marge));
+  padding: 0;
+}
+
+/* Case : un fin joint entre les photos (demi-espace de chaque côté). */
+.tuile {
+  position: absolute;
+  padding: calc(var(--espace) / 2);
+}
+
+.tuile > .lien {
+  border-radius: 0;
+}
+
+.tuile > .lien > :first-child {
+  height: 100%;
+}
+
+/* --- Frise des heures (variantes plein écran) -------------------------------
+   À gauche, fixée sous la barre du jour : toutes les heures, celle en cours
+   mise en valeur. Elle remplace l'intitulé collant (gardé pour les lecteurs
+   d'écran) ; les pages vont de la frise au bord droit de l'écran. */
+.journee[data-plein-ecran] {
+  --largeur-frise: 4rem;
+  padding-left: var(--largeur-frise);
+}
+
+.journee[data-plein-ecran] .moment > .heure {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.journee[data-plein-ecran] .pagePhoto,
+.journee[data-plein-ecran] .mosaique {
+  margin-left: 0;
+  margin-right: calc(-1 * var(--marge));
+}
+
+.frise {
+  position: fixed;
+  left: 0;
+  top: var(--hauteur-barre);
+  bottom: 0;
+  z-index: 3;
+  width: calc(var(--largeur-frise) + var(--marge));
+  padding: 2rem 0 2rem var(--marge);
+  display: flex;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--duree-normale) ease,
+    visibility 0s linear var(--duree-normale);
+}
+
+.frise[data-visible] {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--duree-normale) ease,
+    visibility 0s;
+}
+
+/* Visionneuse ouverte : la frise ne passe pas par-dessus. */
+:global(html.sans-defilement) .frise {
+  visibility: hidden;
+}
+
+.friseListe {
+  position: relative;
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Le fil, à gauche des heures, et le repère qui glisse dessus. */
+.friseFil {
+  position: absolute;
+  left: var(--marge);
+  top: 2rem;
+  bottom: 2rem;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--filet);
+}
+
+.friseRepere {
+  position: absolute;
+  left: calc(var(--marge) - 4px);
+  top: calc(2rem - 5px);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-vif);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-vif) 25%, transparent);
+}
+
+.friseHeure {
+  display: block;
+  padding: 0.15rem 0 0.15rem 0.85rem;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: var(--police-titre);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--encre);
+  opacity: 0.45;
+  transform-origin: left center;
+  transition:
+    opacity var(--duree-normale) ease,
+    transform var(--duree-normale) ease;
+}
+
+.friseHeure:hover {
+  opacity: 0.8;
+}
+
+.friseHeure[data-courant] {
+  opacity: 1;
+  color: var(--accent);
+  transform: scale(1.25);
+}
+
+/* Teinte de la page à l'écran (FriseHeures) : repère vif, heure en cours
+   assez foncée pour rester lisible sur le papier (toujours clair, L ≈ 0,97). */
+.frise[data-teinte] .friseRepere {
+  background: oklch(from var(--couleur-frise) 0.62 max(c, 0.12) h);
+  box-shadow: 0 0 0 4px oklch(from var(--couleur-frise) 0.62 max(c, 0.12) h / 0.25);
+}
+
+.frise[data-teinte] .friseHeure[data-courant] {
+  color: oklch(from var(--couleur-frise) 0.45 max(c, 0.1) h);
+}
+
+.frise[data-teinte] .friseFil {
+  background: oklch(from var(--couleur-frise) 0.86 0.05 h);
+}
+
+/* --- Légende d'une page de la mosaïque ----------------------------------------
+   Posée à droite de sa photo, comme le récit sur la couverture du jour :
+   cachée, puis révélée au premier cran (useDefilementParPage, lib/mouvement.ts
+   legendePage) ; le cran suivant passe à la page d'après. */
+.legende {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: min(44%, 36rem);
+  display: flex;
+  align-items: center;
+  padding: 2rem calc(var(--marge) * 2) 2rem 4rem;
+  opacity: 0;
+  transform: translate(56px, 0px);
+  pointer-events: none;
+  background: linear-gradient(
+    to left,
+    oklch(from var(--couleur-photo) 0.16 calc(c * 0.5) h / 0.88) 0%,
+    oklch(from var(--couleur-photo) 0.16 calc(c * 0.5) h / 0.72) 60%,
+    transparent 100%
+  );
+  color: oklch(from var(--couleur-photo) 0.97 calc(c * 0.35) h);
+  text-shadow: 0 1px 12px oklch(from var(--couleur-photo) 0.15 calc(c * 0.4) h / 0.6);
+}
+
+.legende[data-clair] {
+  background: linear-gradient(
+    to left,
+    oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.92) 0%,
+    oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.76) 60%,
+    transparent 100%
+  );
+  color: oklch(from var(--couleur-photo) 0.2 calc(c * 0.5) h);
+  text-shadow: 0 1px 12px oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.6);
+}
+
+.legende p {
+  margin: 0;
+  max-width: var(--largeur-lecture);
+  font-size: clamp(1.15rem, 0.6rem + 0.75vw, 1.6rem);
+  line-height: 1.6;
 }

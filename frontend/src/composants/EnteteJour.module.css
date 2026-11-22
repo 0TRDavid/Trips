@@ -3,26 +3,49 @@
   gap: 0.4rem;
 }
 
+/* Retour vers le voyage : dans la barre du jour ; ici, pour le clavier
+   seulement (visible quand il a le focus, en haut à droite). */
 .retour {
-  justify-self: start;
+  position: absolute;
+  top: 0.75rem;
+  right: var(--marge);
+  z-index: 6;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: var(--papier);
+  color: var(--encre);
   text-decoration: none;
-  color: var(--encre-2);
   font-size: 0.95rem;
-  margin-bottom: clamp(0.5rem, 2vw, 1.25rem);
+}
+
+.retour:not(:focus-visible) {
+  clip-path: inset(50%);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 0;
 }
 
 .retour:hover {
   color: var(--accent);
 }
 
-/* Même hauteur que l'en-tête du voyage : au plus un quart de l'écran. */
+/* Photo d'ouverture : grande, la journée commence par elle. */
 .visuel {
-  height: 25vh;
-  height: 25svh;
+  height: 70vh;
+  height: 70svh;
   /* Couverture d'un bord à l'autre de l'écran, sans coins arrondis. */
   margin-inline: calc(-1 * var(--marge));
   overflow: hidden;
   background: var(--papier-2);
+}
+
+@media (min-width: 900px) {
+  .visuel {
+    height: 78vh;
+    height: 78svh;
+  }
 }
 
 .filet {
@@ -46,4 +69,325 @@
 
 .meta {
   color: var(--encre-2);
+}
+
+/* --- Ouverture plein écran (variantes « plein-… » du labo) --------------------
+   Dans la page, le cadre a la hauteur du bandeau ; à l'écran, il est étiré
+   jusqu'en bas (transform posé par EnteteJour, puis lié au défilement) et
+   passe devant ce qui suit, sauf le titre. */
+.visuelPlein {
+  position: relative;
+  /* Collé au haut de l'écran : remonte par-dessus la place de la marque
+     (masquée sur cette page) et la marge haute de la page. */
+  margin-top: calc(-1 * (var(--hauteur-entete) + var(--retrait-page, 0px)));
+  overflow: visible;
+  background: none;
+  /* Au-dessus de la galerie, intitulés d'heure collants compris (z-index 2). */
+  z-index: 3;
+}
+
+.piste {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cadrePlein {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  transform-origin: 50% 0;
+  background: var(--papier-2);
+}
+
+.photoPlein {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 100%;
+  transform-origin: 50% 0;
+}
+
+.photoPlein > * {
+  height: 100%;
+}
+
+/* Voile en bas de la photo, sous le titre : garantit le contraste. Couleur
+   tirée de la photo (teinte conservée, très sombre ou très claire). */
+.voile {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    oklch(from var(--couleur-photo) 0.18 calc(c * 0.5) h / 0.9) 0%,
+    oklch(from var(--couleur-photo) 0.18 calc(c * 0.5) h / 0.65) 22%,
+    transparent 48%
+  );
+}
+
+.entete[data-clair] .voile {
+  background: linear-gradient(
+    to top,
+    oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.92) 0%,
+    oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.7) 22%,
+    transparent 48%
+  );
+}
+
+/* Les deux titres empilés : le normal (sous la photo, à la fin) et sa copie
+   posée sur la photo (au début), en fondu enchaîné au défilement. */
+.titres {
+  position: relative;
+  z-index: 4;
+}
+
+.titres[data-attente] {
+  opacity: 0;
+}
+
+.titresNormaux,
+.titresSurPhoto {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.titresSurPhoto {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: oklch(from var(--couleur-photo) 0.97 calc(c * 0.35) h);
+  text-shadow: 0 1px 12px oklch(from var(--couleur-photo) 0.15 calc(c * 0.4) h / 0.5);
+}
+
+.entete[data-clair] .titresSurPhoto {
+  color: oklch(from var(--couleur-photo) 0.2 calc(c * 0.5) h);
+  text-shadow: 0 1px 12px oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.6);
+}
+
+/* Copie du h1 (un simple paragraphe) : mêmes réglages que les titres. */
+.titresSurPhoto .titre {
+  font-family: var(--police-titre);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.titresSurPhoto .date,
+.titresSurPhoto .titre,
+.titresSurPhoto .meta {
+  color: inherit;
+}
+
+/* Mouvement réduit : bandeau fixe, titre dessous, sans copie ni voile. */
+.entete:not([data-plein]) .titresSurPhoto,
+.entete:not([data-plein]) .voile {
+  display: none;
+}
+
+/* --- Barre du jour (BarreJour) ---------------------------------------------
+   En-tête compact fixé en haut de l'écran, sur la photo de couverture. Hors
+   de l'écran tant que le titre est visible (état de repos : CSS ; passages
+   joués par element.animate). */
+.barre {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  height: var(--hauteur-barre);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 var(--marge);
+  overflow: hidden;
+  isolation: isolate;
+  color: oklch(from var(--couleur-photo) 0.97 calc(c * 0.35) h);
+  opacity: 0;
+  transform: translate(0px, -100%);
+  pointer-events: none;
+  box-shadow: 0 2px 16px rgb(0 0 0 / 0.18);
+}
+
+.barre[data-visible] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.entete[data-clair] .barre {
+  color: oklch(from var(--couleur-photo) 0.2 calc(c * 0.5) h);
+}
+
+/* Visionneuse ouverte : la barre ne passe pas par-dessus. */
+:global(html.sans-defilement) .barre {
+  visibility: hidden;
+}
+
+.barreFond {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.barreFond > * {
+  height: 100%;
+}
+
+/* Voile : garantit le contraste du texte sur n'importe quelle photo. */
+.barreFond::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: oklch(from var(--couleur-photo) 0.2 calc(c * 0.5) h / 0.62);
+}
+
+.entete[data-clair] .barreFond::after {
+  background: oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.72);
+}
+
+.barreTitre {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.barreDate {
+  flex: none;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.barreNom {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--police-titre);
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+/* Téléphone : le titre seul, la date prendrait la place du retour. */
+@media (max-width: 600px) {
+  .barreDate {
+    display: none;
+  }
+}
+
+.barreRetour {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.barreRetour:hover {
+  text-decoration: underline;
+}
+
+/* Indication « Glisser » en bas au centre de la photo plein écran (sous le
+   titre, dans la marge qui lui est réservée). Même encre que le titre. */
+.indice {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: oklch(from var(--couleur-photo) 0.97 calc(c * 0.35) h);
+}
+
+.entete[data-clair] .indice {
+  color: oklch(from var(--couleur-photo) 0.2 calc(c * 0.5) h);
+}
+
+.indiceContenu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* --- Récit sur la couverture (galerie plein écran) -------------------------
+   À droite, sur toute la hauteur de la photo : un voile qui s'épaissit vers
+   le bord droit, le texte dessus (couleurs du titre posé sur la photo). */
+.recitCouverture {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 4;
+  width: min(44%, 40rem);
+  pointer-events: none;
+}
+
+.recitPanneau {
+  height: 100%;
+  opacity: 0;
+  transform: translate(56px, 0px);
+  display: flex;
+  align-items: center;
+  padding: calc(var(--hauteur-barre) + 1rem) calc(var(--marge) * 2) 5rem 5rem;
+  background: linear-gradient(
+    to left,
+    oklch(from var(--couleur-photo) 0.16 calc(c * 0.5) h / 0.88) 0%,
+    oklch(from var(--couleur-photo) 0.16 calc(c * 0.5) h / 0.72) 60%,
+    transparent 100%
+  );
+  color: oklch(from var(--couleur-photo) 0.97 calc(c * 0.35) h);
+  text-shadow: 0 1px 12px oklch(from var(--couleur-photo) 0.15 calc(c * 0.4) h / 0.6);
+}
+
+.recitPanneau[data-montre] {
+  pointer-events: auto;
+}
+
+.entete[data-clair] .recitPanneau {
+  background: linear-gradient(
+    to left,
+    oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.92) 0%,
+    oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.76) 60%,
+    transparent 100%
+  );
+  color: oklch(from var(--couleur-photo) 0.2 calc(c * 0.5) h);
+  text-shadow: 0 1px 12px oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.6);
+}
+
+/* Récit plus long que l'écran : il défile dans son cadre, fondu en bas. */
+.recitDefile {
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+  mask-image: linear-gradient(to bottom, black calc(100% - 2.5rem), transparent);
+  padding-bottom: 2rem;
+}
+
+.recitPanneau .recitTexte {
+  max-width: var(--largeur-lecture);
+  color: inherit;
+  font-size: clamp(1.15rem, 0.6rem + 0.75vw, 1.6rem);
+  line-height: 1.6;
+}
+
+.recitPanneau .recitTexte :global(*) {
+  color: inherit;
+}
+
+.recitPanneau .recitTexte :global(:is(p, li, blockquote)) {
+  font-size: inherit;
+  line-height: inherit;
 }
