@@ -495,6 +495,11 @@ export function recitCouverture(visible: boolean, reduit: boolean): AnimationNat
     : { images: [{ ...montre, transform: "translate(0px, 0px)" }, cache], options: { duration: t(duree.normale * facteurSortie) * 1000, easing: cssBezier(courbe.sortie) } };
 }
 
+/** Légende d'une page de la mosaïque : même entrée par la droite que le récit de la couverture. */
+export function legendePage(visible: boolean, reduit: boolean): AnimationNative {
+  return recitCouverture(visible, reduit);
+}
+
 /** Rebond de la flèche « Glisser » (en boucle). Null en mouvement réduit : elle reste immobile. */
 export function rebondIndice(reduit: boolean): AnimationNative | null {
   if (reduit) return null;

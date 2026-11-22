@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from "react";
-import { defilement } from "../lib/mouvement";
+import { defilement, legendePage } from "../lib/mouvement";
 import { mouvementReduit } from "./useMouvementReduit";
 
 /**
@@ -23,12 +23,29 @@ import { mouvementReduit } from "./useMouvementReduit";
  * `carnet:recit-couverture`), le suivant glisse vers la journée ; vers le haut,
  * l'inverse. Un récit trop long pour l'écran défile dans son cadre.
  *
+ * Légendes : une page de la mosaïque qui porte une légende (`[data-legendes]`)
+ * la révèle au premier cran vers le bas, sans défiler ; le suivant passe à la
+ * page d'après (la légende s'efface en partant). Vers le haut, l'inverse.
+ *
  * Au bout de la journée, un cran de plus mène au jour suivant (`auBout`) ;
  * l'élan de ce geste est absorbé par la nouvelle page (dernier cran partagé).
  */
 let dernierCran = 0; // horodatage du dernier cran, partagé d'une page à l'autre
 
 export const EVENEMENT_RECIT = "carnet:recit-couverture";
+
+/** Montre ou cache les légendes d'une page de la mosaïque (animation native). */
+function basculerLegendes(page: HTMLElement, montrer: boolean) {
+  page.toggleAttribute("data-montre", montrer);
+  const a = legendePage(montrer, mouvementReduit());
+  const fin = a.images[a.images.length - 1];
+  for (const legende of page.querySelectorAll<HTMLElement>("[data-legende]")) {
+    legende.style.opacity = String(fin.opacity);
+    legende.style.transform = String(fin.transform ?? "none");
+    legende.animate(a.images, a.options);
+  }
+}
+
 export function useDefilementParPage(
   racine: RefObject<HTMLElement | null>,
   actif: boolean,
@@ -73,8 +90,20 @@ export function useDefilementParPage(
       return true;
     };
 
+    /** Étape « légende » de la page à l'écran : vrai si le geste l'a consommée. */
+    const etapeLegende = (sens: 1 | -1) => {
+      const page = [...el.querySelectorAll<HTMLElement>("[data-legendes]")].find(
+        (p) => Math.abs(p.getBoundingClientRect().top - haut) < 3,
+      );
+      if (!page) return false;
+      const montre = page.hasAttribute("data-montre");
+      if (sens > 0 === montre) return false;
+      basculerLegendes(page, sens > 0);
+      return true;
+    };
+
     const aller = (sens: 1 | -1) => {
-      if (etapeCouverture(sens)) return;
+      if (etapeCouverture(sens) || etapeLegende(sens)) return;
       const y = window.scrollY;
       const max = document.documentElement.scrollHeight - window.innerHeight;
       const ancres = blocs().map((b) => b.haut);
@@ -88,6 +117,7 @@ export function useDefilementParPage(
         return;
       }
       enCours = true;
+      for (const page of el.querySelectorAll<HTMLElement>("[data-legendes][data-montre]")) basculerLegendes(page, false);
       window.scrollTo({ top: cible, behavior: mouvementReduit() ? "auto" : "smooth" });
       // Fin du glissement : `scrollend` si le navigateur le connaît, sinon un délai.
       if (avecScrollend) window.addEventListener("scrollend", terminer, { once: true });
@@ -115,7 +145,8 @@ export function useDefilementParPage(
       const sens = touches[e.key];
       const cible = e.target as HTMLElement | null;
       if (!sens || pause() || e.altKey || e.ctrlKey || e.metaKey) return;
-      if (cible?.closest("input, textarea, select, [contenteditable]")) return;
+      // Une vidéo qui a le focus garde ses touches (Espace = lecture / pause).
+      if (cible?.closest("input, textarea, select, [contenteditable], video")) return;
       const s = e.key === " " && e.shiftKey ? -1 : sens;
       if (lectureLibre(s)) return;
       e.preventDefault();

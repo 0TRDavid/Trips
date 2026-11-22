@@ -154,6 +154,11 @@
   overflow: hidden;
 }
 
+/* Vidéo en lecture : les clics vont à ses contrôles. */
+.lien[data-lecture] {
+  cursor: auto;
+}
+
 .lien:focus-visible {
   outline-offset: -3px;
 }
@@ -239,6 +244,7 @@
 }
 
 .cellulePhoto {
+  position: relative;
   height: 100%;
 }
 
@@ -386,4 +392,49 @@
   opacity: 1;
   color: var(--accent);
   transform: scale(1.25);
+}
+
+/* --- Légende d'une page de la mosaïque ----------------------------------------
+   Posée à droite de sa photo, comme le récit sur la couverture du jour :
+   cachée, puis révélée au premier cran (useDefilementParPage, lib/mouvement.ts
+   legendePage) ; le cran suivant passe à la page d'après. */
+.legende {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: min(44%, 36rem);
+  display: flex;
+  align-items: center;
+  padding: 2rem calc(var(--marge) * 2) 2rem 4rem;
+  opacity: 0;
+  transform: translate(56px, 0px);
+  pointer-events: none;
+  background: linear-gradient(
+    to left,
+    oklch(from var(--couleur-photo) 0.16 calc(c * 0.5) h / 0.88) 0%,
+    oklch(from var(--couleur-photo) 0.16 calc(c * 0.5) h / 0.72) 60%,
+    transparent 100%
+  );
+  color: oklch(from var(--couleur-photo) 0.97 calc(c * 0.35) h);
+  text-shadow: 0 1px 12px oklch(from var(--couleur-photo) 0.15 calc(c * 0.4) h / 0.6);
+}
+
+.legende[data-clair] {
+  background: linear-gradient(
+    to left,
+    oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.92) 0%,
+    oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.76) 60%,
+    transparent 100%
+  );
+  color: oklch(from var(--couleur-photo) 0.2 calc(c * 0.5) h);
+  text-shadow: 0 1px 12px oklch(from var(--couleur-photo) 0.97 calc(c * 0.3) h / 0.6);
+}
+
+.legende p {
+  margin: 0;
+  max-width: var(--largeur-lecture);
+  font-size: clamp(1.15rem, 0.6rem + 0.75vw, 1.6rem);
+  line-height: 1.6;
 }

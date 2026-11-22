@@ -9,6 +9,7 @@ import { dateCourte, heureLocale, libelleHeure } from "../lib/dates";
 import { reglages, type VarianteCollant } from "../lib/mouvement";
 import { galeriePleinEcran, mosaiquePleinEcran } from "../lib/rangees";
 import { bornesHeures, entremeler } from "../lib/recit";
+import { estClaire } from "../lib/palette";
 import { placeholderDataUrl } from "../lib/placeholder";
 import { ratio } from "../lib/rendus";
 import { idPhoto } from "../lib/transitions";
@@ -18,6 +19,7 @@ import FriseHeures from "./FriseHeures";
 import Photo from "./Photo";
 import PhotoAnimee from "./PhotoAnimee";
 import ProgressionJour from "./ProgressionJour";
+import VideoGalerie from "./VideoGalerie";
 import Recit from "./Recit";
 import styles from "./GaleriePhotos.module.css";
 
@@ -68,6 +70,11 @@ export default function GaleriePhotos({ slug, date, photos, blocs, suspendu, sui
   useDefilementParPage(racine, !!place, place?.haut ?? 0, versSuivant);
   const chef = useNouveauChefDeLecture(suspendu);
   useApparitionPhotos(racine, true);
+  // Visionneuse ouverte : les vidéos lues sur place se mettent en pause.
+  useEffect(() => {
+    if (!suspendu) return;
+    racine.current?.querySelectorAll<HTMLVideoElement>("video[data-video-galerie]").forEach((v) => v.pause());
+  }, [suspendu]);
   let numero = 0;
 
   return (
@@ -158,7 +165,13 @@ function MosaiquePleinEcran({ slug, date, photos, place }: PropsRangees & { plac
           const photo = photos[debut];
           const fond = page.couvrir ? null : placeholderDataUrl(photo.placeholder);
           return (
-            <div key={debut} className={styles.pagePhoto} style={{ height: place.ecran }} data-ancre="">
+            <div
+              key={debut}
+              className={styles.pagePhoto}
+              style={{ height: place.ecran }}
+              data-ancre=""
+              data-legendes={photo.legende ? "" : undefined}
+            >
               {fond && <div className={styles.fondFlou} style={{ backgroundImage: `url(${fond})` }} aria-hidden />}
               <ul className={styles.listePhoto}>
                 <Cellule
@@ -169,13 +182,20 @@ function MosaiquePleinEcran({ slug, date, photos, place }: PropsRangees & { plac
                   className={styles.cellulePhoto}
                   style={{}}
                   mode={page.couvrir ? "couvrir" : "contenir"}
+                  avecLegende
                 />
               </ul>
             </div>
           );
         }
         return (
-          <ul key={debut} className={styles.mosaique} style={{ height: place.ecran }} data-ancre="">
+          <ul
+            key={debut}
+            className={styles.mosaique}
+            style={{ height: place.ecran }}
+            data-ancre=""
+            data-legendes={cases.some((_, k) => photos[debut + k].legende) ? "" : undefined}
+          >
             {cases.map((c, k) => {
               const photo = photos[debut + k];
               return (
@@ -188,6 +208,7 @@ function MosaiquePleinEcran({ slug, date, photos, place }: PropsRangees & { plac
                   className={styles.tuile}
                   style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%`, width: `${c.l * 100}%`, height: `${c.h * 100}%` }}
                   mode="couvrir"
+                  avecLegende
                 />
               );
             })}
@@ -237,49 +258,78 @@ type PropsCellule = {
   className?: string;
   /** Mode d'affichage de Photo ("naturel" par défaut ; plein écran : couvrir / contenir). */
   mode?: "naturel" | "couvrir" | "contenir";
+  /** Mosaïque plein écran : la légende est posée à droite, révélée au premier cran (useDefilementParPage). */
+  avecLegende?: boolean;
 };
 
-function Cellule({ slug, date, photo, sizes, style, className, mode }: PropsCellule) {
+function Cellule({ slug, date, photo, sizes, style, className, mode, avecLegende }: PropsCellule) {
   const naviguer = useNavigate();
-  // La page jour reste en place derrière la visionneuse.
-  const ouvrir = () => naviguer(chemins.photo(slug, date, photo.id), { preventScrollReset: true, state: { depuisJour: true } });
+  // Vidéo : lue sur place au clic (petit côté de la case, pour choisir 720p / 1080p).
+  const lisible = photo.type === "video" && aUneVideo(photo);
+  const [lecture, setLecture] = useState<number | null>(null);
+  const ouvrir = (cible: HTMLElement) => {
+    if (lisible) {
+      if (lecture === null) {
+        const r = cible.getBoundingClientRect();
+        setLecture(Math.min(r.width, r.height));
+      }
+      return;
+    }
+    // La page jour reste en place derrière la visionneuse.
+    naviguer(chemins.photo(slug, date, photo.id), { preventScrollReset: true, state: { depuisJour: true } });
+  };
   const nature = photo.type === "video" ? "Vidéo" : "Photo";
   const alt = photo.legende || `${nature} du ${dateCourte(date)}${photo.prise_le ? ` à ${heureLocale(photo.prise_le)}` : ""}`;
   const image =
     photo.type === "animee" && aUneVideo(photo) ? (
       <PhotoAnimee photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} mode={mode} />
     ) : (
-      <Photo photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} mode={mode} />
+      <Photo photo={photo} sizes={sizes} alt={alt} transitionId={idPhoto(photo.id)} mode={mode}>
+        {lecture !== null && <VideoGalerie photo={photo} petitCote={lecture} />}
+      </Photo>
     );
+  const enLecture = lecture !== null;
   return (
     <li className={className ?? styles.cellule} style={style} data-apparition="">
       {/* Pas de <a href> : le navigateur afficherait l'adresse en bas à gauche au survol. */}
       <div
-        role="link"
-        tabIndex={0}
-        aria-label={alt}
+        role={enLecture ? undefined : lisible ? "button" : "link"}
+        tabIndex={enLecture ? undefined : 0}
+        aria-label={enLecture ? undefined : lisible ? `Lire la vidéo${photo.duree ? ` (${formatDuree(photo.duree)})` : ""}` : alt}
         className={styles.lien}
-        onClick={ouvrir}
+        data-lecture={enLecture ? "" : undefined}
+        onClick={(e) => ouvrir(e.currentTarget)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
+          if (e.key === "Enter" && e.target === e.currentTarget) {
             e.preventDefault();
-            ouvrir();
+            ouvrir(e.currentTarget);
           }
         }}
       >
         {image}
-        {photo.type === "video" && (
+        {photo.type === "video" && !enLecture && (
           <span className={styles.badgeVideo} aria-hidden="true">
             <span className={styles.triangle}>▶</span>
             {formatDuree(photo.duree)}
           </span>
         )}
-        {photo.favori && (
+        {photo.favori && !enLecture && (
           <span className={styles.favori} title="Favori" aria-label="Favori">
             ★
           </span>
         )}
       </div>
+      {avecLegende && photo.legende && (
+        <div
+          className={styles.legende}
+          data-legende=""
+          data-clair={estClaire(photo.couleur) ? "" : undefined}
+          style={{ "--couleur-photo": photo.couleur } as CSSProperties}
+          aria-hidden="true"
+        >
+          <p>{photo.legende}</p>
+        </div>
+      )}
     </li>
   );
 }
