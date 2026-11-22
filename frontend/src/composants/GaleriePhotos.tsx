@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import type { BlocRecit, PhotoJour } from "../api/types";
 import { useApparitionPhotos } from "../hooks/useApparitionPhotos";
 import { useDefilementParPage } from "../hooks/useDefilementParPage";
@@ -240,6 +240,9 @@ type PropsCellule = {
 };
 
 function Cellule({ slug, date, photo, sizes, style, className, mode }: PropsCellule) {
+  const naviguer = useNavigate();
+  // La page jour reste en place derrière la visionneuse.
+  const ouvrir = () => naviguer(chemins.photo(slug, date, photo.id), { preventScrollReset: true, state: { depuisJour: true } });
   const nature = photo.type === "video" ? "Vidéo" : "Photo";
   const alt = photo.legende || `${nature} du ${dateCourte(date)}${photo.prise_le ? ` à ${heureLocale(photo.prise_le)}` : ""}`;
   const image =
@@ -250,12 +253,19 @@ function Cellule({ slug, date, photo, sizes, style, className, mode }: PropsCell
     );
   return (
     <li className={className ?? styles.cellule} style={style} data-apparition="">
-      <Link
-        to={chemins.photo(slug, date, photo.id)}
-        // La page jour reste en place derrière la visionneuse.
-        preventScrollReset
-        state={{ depuisJour: true }}
+      {/* Pas de <a href> : le navigateur afficherait l'adresse en bas à gauche au survol. */}
+      <div
+        role="link"
+        tabIndex={0}
+        aria-label={alt}
         className={styles.lien}
+        onClick={ouvrir}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            ouvrir();
+          }
+        }}
       >
         {image}
         {photo.type === "video" && (
@@ -269,7 +279,7 @@ function Cellule({ slug, date, photo, sizes, style, className, mode }: PropsCell
             ★
           </span>
         )}
-      </Link>
+      </div>
     </li>
   );
 }

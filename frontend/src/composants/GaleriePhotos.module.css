@@ -148,6 +148,7 @@
 .lien {
   position: relative;
   display: block;
+  cursor: pointer;
   height: 100%;
   border-radius: 3px;
   overflow: hidden;

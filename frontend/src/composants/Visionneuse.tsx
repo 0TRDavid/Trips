@@ -8,7 +8,7 @@ import { useTouchesClavier } from "../hooks/useTouchesClavier";
 import { useVolEntrant } from "../hooks/useVolEntrant";
 import { dateCourte, heureLocale } from "../lib/dates";
 import type { Sens } from "../lib/mouvement";
-import { fondu, transitionFondVisionneuse, variantesPhotoVoisine, volPhoto } from "../lib/mouvement";
+import { dureeDe, fondu, transitionFondVisionneuse, variantesPhotoVoisine, volPhoto } from "../lib/mouvement";
 import { consommerRetourDejaAnime } from "../lib/navigation";
 import { srcset } from "../lib/rendus";
 import { idPhoto } from "../lib/transitions";
@@ -94,6 +94,9 @@ export default function Visionneuse({ photos, index, date, depuisGalerie, preced
 
   // --- Ouverture ---------------------------------------------------------------
   const ouvertureAnimee = depuisGalerie;
+  // Seul le média d'ouverture attend la fin du vol avant de lancer sa vidéo.
+  const idOuverture = useRef(photo?.id);
+  const volOuverture = ouvertureAnimee && !mouvementReduit ? dureeDe(volPhoto(1)) : 0;
   useVolEntrant(
     photo ? idPhoto(photo.id) : "",
     () => (photo ? dialogue.current?.querySelector<HTMLElement>(selecteurTransition(idPhoto(photo.id))) ?? null : null),
@@ -214,7 +217,12 @@ export default function Visionneuse({ photos, index, date, depuisGalerie, preced
             exit="sortie"
           >
               {photo?.type === "video" ? (
-                <LecteurVideo photo={photo} alt={alt} transitionId={idPhoto(photo.id)} />
+                <LecteurVideo
+                  photo={photo}
+                  alt={alt}
+                  transitionId={idPhoto(photo.id)}
+                  delaiDepart={photo.id === idOuverture.current ? volOuverture : 0}
+                />
               ) : animee ? (
                 <PhotoAnimee
                   key={`${photo.id}-${nbAnimations}`}
