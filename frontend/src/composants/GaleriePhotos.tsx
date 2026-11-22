@@ -171,6 +171,7 @@ function MosaiquePleinEcran({ slug, date, photos, place }: PropsRangees & { plac
               style={{ height: place.ecran }}
               data-ancre=""
               data-legendes={photo.legende ? "" : undefined}
+              data-couleur={photo.couleur_vive ?? undefined}
             >
               {fond && <div className={styles.fondFlou} style={{ backgroundImage: `url(${fond})` }} aria-hidden />}
               <ul className={styles.listePhoto}>
@@ -195,6 +196,7 @@ function MosaiquePleinEcran({ slug, date, photos, place }: PropsRangees & { plac
             style={{ height: place.ecran }}
             data-ancre=""
             data-legendes={cases.some((_, k) => photos[debut + k].legende) ? "" : undefined}
+            data-couleur={cases.map((_, k) => photos[debut + k].couleur_vive).find(Boolean) ?? undefined}
           >
             {cases.map((c, k) => {
               const photo = photos[debut + k];

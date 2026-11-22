@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { mouvementReduit } from "../hooks/useMouvementReduit";
 import { libelleHeure } from "../lib/dates";
 import { deplacementFrise } from "../lib/mouvement";
@@ -15,6 +15,9 @@ import styles from "./GaleriePhotos.module.css";
  * seul IntersectionObserver, aucun calcul au défilement). Le repère est
  * déplacé par element.animate (transform) ; les libellés changent d'opacité
  * (transition CSS, durée des tokens).
+ *
+ * Teinte : le repère et l'heure en cours prennent la couleur vive de la page
+ * à l'écran (`data-couleur`, API `couleur_vive`) ; page terne = accent du jour.
  */
 export default function FriseHeures({
   racine,
@@ -29,6 +32,7 @@ export default function FriseHeures({
 }) {
   const [courant, setCourant] = useState(0);
   const [visible, setVisible] = useState(false);
+  const [teinte, setTeinte] = useState<string | null>(null);
   const liste = useRef<HTMLOListElement>(null);
   const repere = useRef<HTMLSpanElement>(null);
   const position = useRef<number | null>(null);
@@ -46,6 +50,15 @@ export default function FriseHeures({
       { root: document, rootMargin: "-50% 0px -49% 0px" },
     );
     sections.forEach((s) => observateur.observe(s));
+    // Couleur de la page qui croise la même ligne de lecture.
+    const pages = new IntersectionObserver(
+      (entrees) => {
+        const croise = entrees.find((e) => e.isIntersecting);
+        if (croise) setTeinte((croise.target as HTMLElement).dataset.couleur ?? null);
+      },
+      { root: document, rootMargin: "-50% 0px -49% 0px" },
+    );
+    conteneur.querySelectorAll<HTMLElement>("[data-ancre]").forEach((p) => pages.observe(p));
     // Visible quand la journée occupe la ligne juste sous la barre du jour.
     const ligne = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), {
       root: document,
@@ -54,6 +67,7 @@ export default function FriseHeures({
     ligne.observe(conteneur);
     return () => {
       observateur.disconnect();
+      pages.disconnect();
       ligne.disconnect();
     };
   }, [racine, heures, haut]);
@@ -82,7 +96,13 @@ export default function FriseHeures({
   };
 
   return (
-    <nav className={styles.frise} aria-label="Heures de la journée" data-visible={visible ? "" : undefined}>
+    <nav
+      className={styles.frise}
+      aria-label="Heures de la journée"
+      data-visible={visible ? "" : undefined}
+      data-teinte={teinte ? "" : undefined}
+      style={teinte ? ({ "--couleur-frise": teinte } as CSSProperties) : undefined}
+    >
       <span className={styles.friseFil} aria-hidden />
       <span ref={repere} className={styles.friseRepere} aria-hidden />
       <ol ref={liste} className={styles.friseListe}>

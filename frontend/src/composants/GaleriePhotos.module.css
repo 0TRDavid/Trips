@@ -252,7 +252,7 @@
   border-radius: 0;
 }
 
-.cellulePhoto > .lien > * {
+.cellulePhoto > .lien > :first-child {
   height: 100%;
 }
 
@@ -274,7 +274,7 @@
   border-radius: 0;
 }
 
-.tuile > .lien > * {
+.tuile > .lien > :first-child {
   height: 100%;
 }
 
@@ -283,7 +283,7 @@
    mise en valeur. Elle remplace l'intitulé collant (gardé pour les lecteurs
    d'écran) ; les pages vont de la frise au bord droit de l'écran. */
 .journee[data-plein-ecran] {
-  --largeur-frise: 5.5rem;
+  --largeur-frise: 4rem;
   padding-left: var(--largeur-frise);
 }
 
@@ -368,12 +368,12 @@
 
 .friseHeure {
   display: block;
-  padding: 0.15rem 0 0.15rem 1.1rem;
+  padding: 0.15rem 0 0.15rem 0.85rem;
   border: 0;
   background: none;
   cursor: pointer;
   font-family: var(--police-titre);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: var(--encre);
@@ -392,6 +392,21 @@
   opacity: 1;
   color: var(--accent);
   transform: scale(1.25);
+}
+
+/* Teinte de la page à l'écran (FriseHeures) : repère vif, heure en cours
+   assez foncée pour rester lisible sur le papier (toujours clair, L ≈ 0,97). */
+.frise[data-teinte] .friseRepere {
+  background: oklch(from var(--couleur-frise) 0.62 max(c, 0.12) h);
+  box-shadow: 0 0 0 4px oklch(from var(--couleur-frise) 0.62 max(c, 0.12) h / 0.25);
+}
+
+.frise[data-teinte] .friseHeure[data-courant] {
+  color: oklch(from var(--couleur-frise) 0.45 max(c, 0.1) h);
+}
+
+.frise[data-teinte] .friseFil {
+  background: oklch(from var(--couleur-frise) 0.86 0.05 h);
 }
 
 /* --- Légende d'une page de la mosaïque ----------------------------------------

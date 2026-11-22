@@ -151,12 +151,18 @@ class DetailJourTests(TestCase):
         self.assertEqual(
             set(photo),
             {"id", "largeur", "hauteur", "couleur", "placeholder", "rendus", "prise_le", "legende", "favori",
-             "photographe", "type", "duree", "videos"},
+             "photographe", "type", "duree", "videos", "couleur_vive"},
         )
+        self.assertIsNone(photo["couleur_vive"])
         self.assertEqual((photo["type"], photo["duree"], photo["videos"]), ("photo", None, {}))
         self.assertEqual(photo["photographe"], "")
         self.assertEqual((photo["largeur"], photo["hauteur"], photo["couleur"]), (3000, 2000, "#336699"))
         self.assertEqual(photo["rendus"]["moyenne"]["url"], f"/media/rendus/{photo['id']}/abc-moyenne.webp")
+
+    def test_couleur_vive(self):
+        Photo.objects.filter(jour=self.jour).update(couleurs=[{"hex": "#c2185b", "part": 0.12}, {"hex": "#1565c0", "part": 0.3}])
+
+        self.assertEqual({p["couleur_vive"] for p in self.get().json()["photos"]}, {"#c2185b"})
 
     def test_video_et_photo_animee(self):
         creer_photo(self.jour, 5, type=Photo.Type.VIDEO, duree=54.12)

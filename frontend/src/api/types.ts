@@ -43,6 +43,8 @@ export type PhotoJour = PhotoResume & {
   favori: boolean;
   /** Prénom tiré du sous-dossier Nextcloud ("Hugo"), vide si inconnu. */
   photographe: string;
+  /** Couleur la plus marquante du média (palette.py), null s'il est terne. */
+  couleur_vive: string | null;
 };
 
 /**

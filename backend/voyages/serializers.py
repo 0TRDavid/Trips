@@ -92,11 +92,16 @@ class PhotoDuJourSerializer(_MediaMixin, VignetteSerializer):
     directement affichable en heure locale."""
 
     prise_le = serializers.SerializerMethodField()
+    couleur_vive = serializers.SerializerMethodField()
 
     class Meta(VignetteSerializer.Meta):
         fields = VignetteSerializer.Meta.fields + [
-            "type", "duree", "videos", "prise_le", "legende", "favori", "photographe",
+            "type", "duree", "videos", "prise_le", "legende", "favori", "photographe", "couleur_vive",
         ]
+
+    def get_couleur_vive(self, photo):
+        """La couleur la plus marquante du média (`Photo.couleurs`, palette.py), ou null s'il est terne."""
+        return photo.couleurs[0]["hex"] if photo.couleurs else None
 
     def get_prise_le(self, photo):
         return photo.prise_le.astimezone(self.context["fuseau"]).isoformat()
