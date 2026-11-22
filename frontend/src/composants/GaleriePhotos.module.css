@@ -188,6 +188,7 @@
   pointer-events: none;
   --teinte-lire: #fff;
   --ombre-lire: rgb(0 0 0 / 0.45);
+  --voile-lire: rgb(0 0 0 / 0.35);
   color: var(--teinte-lire);
   text-shadow: 0 1px 10px var(--ombre-lire);
 }
@@ -195,6 +196,7 @@
 .lireVideo[data-clair] {
   --teinte-lire: oklch(0.2 0 0);
   --ombre-lire: rgb(255 255 255 / 0.55);
+  --voile-lire: rgb(255 255 255 / 0.4);
 }
 
 .lireRond {
@@ -204,9 +206,8 @@
   height: 4.5rem;
   border: 1.5px solid var(--teinte-lire);
   border-radius: 50%;
-  background: color-mix(in srgb, var(--ombre-lire) 60%, transparent);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 16px var(--ombre-lire);
+  /* Voile uni, sans backdrop-filter (rendu en damier par certains navigateurs). */
+  background: var(--voile-lire);
   transition: transform var(--duree-normale) ease;
 }
 
